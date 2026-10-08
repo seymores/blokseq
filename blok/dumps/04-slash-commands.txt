@@ -14,7 +14,7 @@
 │ • Stor│  Code                           command  a code …  │                                                                             │
 │       │  Cards                          command  make th…  │                                                                             │
 │  • typ│  Scheduled                      command  add a S…  │                                                                             │
-│       │ ↑↓ choose  Tab complete  Esc cancel                │                                                                             │
+│       │ ↑↓ choose  ⏎ complete  Esc cancel                  │                                                                             │
 │       ╰────────────────────────────────────────────────────╯                                                                             │
 │                                                                                                                                          │
 │                                                                                                                                          │

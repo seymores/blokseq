@@ -16,7 +16,7 @@
 │  • │▸ [[blok TUI]]                   link  page · blo…  │                                                                                │
 │    │  [[SQLite]]                     link  page · SQL…  │                                                                                │
 │    │  #sync                          link  tag · sync   │                                                                                │
-│    │ ↑↓ choose  Tab complete  Esc cancel                │                                                                                │
+│    │ ↑↓ choose  ⏎ follow  Esc cancel                    │                                                                                │
 │    ╰────────────────────────────────────────────────────╯                                                                                │
 │                                                                                                                                          │
 │                                                                                                                                          │

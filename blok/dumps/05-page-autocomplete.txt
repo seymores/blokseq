@@ -7,7 +7,7 @@
 │▌│ ▾ Follow up next week with [[p                                                                                                         │
 │ │ │ • deadline:: 2026-02-20     ╭ Link to page · [[p ────────────────────────────────╮                                                   │
 │       priority:: A              │▸ Project Aurora                 page  2 links · …  │                                                   │
-│ │ • DOING Write up the sync stor│ ↑↓ choose  Tab complete  Esc cancel                │                                                   │
+│ │ • DOING Write up the sync stor│ ↑↓ choose  ⏎ complete  Esc cancel                  │                                                   │
 │ ▾ Idea: journals are rows, not f╰────────────────────────────────────────────────────╯                                                   │
 │ │ • An empty day should not exist anywhere — not on disk, not in the DB                                                                  │
 │ • Reading:  VACUUM INTO  semantics                                                                                                       │

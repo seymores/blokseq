@@ -9,7 +9,7 @@ use ratatui::Frame;
 
 use crate::app::{App, Focus, ToastKind, View, KEYMAP};
 use crate::db::human_bytes;
-use crate::editor::{Editor, Mode};
+use crate::editor::{Editor, Mode, Trigger};
 use crate::model::{properties, JournalDay, Row};
 use crate::theme::{self, Theme};
 
@@ -1270,12 +1270,19 @@ fn render_popup(f: &mut Frame, app: &App, x: u16, y: u16, bounds: Rect) {
         width: rect.width.saturating_sub(2),
         height: 1,
     };
+    // The chooser *follows*, it does not complete: "Tab complete" over a list of
+    // pages is a promise about a thing that does not happen here.
+    let action = if popup.trigger == Trigger::Link {
+        "follow  "
+    } else {
+        "complete  "
+    };
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(" ↑↓ ", Theme::key()),
             Span::styled("choose  ", Theme::dim().bg(theme::PANEL_ALT)),
-            Span::styled("Tab ", Theme::key()),
-            Span::styled("complete  ", Theme::dim().bg(theme::PANEL_ALT)),
+            Span::styled("⏎ ", Theme::key()),
+            Span::styled(action, Theme::dim().bg(theme::PANEL_ALT)),
             Span::styled("Esc ", Theme::key()),
             Span::styled("cancel", Theme::dim().bg(theme::PANEL_ALT)),
         ]))

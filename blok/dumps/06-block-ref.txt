@@ -14,7 +14,7 @@
 │ • Storage trail: │  Constraint: laptops on 2G lin… block  Project A…  │                                                                  │
 │                  │  Open question #sync: what hap… block  Project A…  │                                                                  │
 │  • type here for │  Decision: ship the **SQLite f… block  Project A…  │                                                                  │
-│                  │ ↑↓ choose  Tab complete  Esc cancel                │                                                                  │
+│                  │ ↑↓ choose  ⏎ complete  Esc cancel                  │                                                                  │
 │                  ╰────────────────────────────────────────────────────╯                                                                  │
 │                                                                                                                                          │
 │                                                                                                                                          │
