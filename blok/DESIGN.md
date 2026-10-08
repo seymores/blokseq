@@ -62,7 +62,7 @@ rather than hiding it.
 | 2 | **Empty journals are pruned, and journals are lazily materialised** | A day you merely *looked at* never becomes a row in the database. See §4. |
 | 3 | **SQLite is the document — no markdown anywhere** | Blocks are rows, links are rows, search is an FTS5 index. Transactions, crash safety and referential integrity come free. |
 | 4 | **Backup = one `VACUUM INTO` snapshot, copied to a remote** | Never sync a live database file (WAL sidecars, hot journals, filesystem locking — see §5). Snapshot, then copy the snapshot. |
-| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.6). |
+| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.7). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
 | 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `Ctrl-M` (or `:set meta`) and persists; the outline is the whole window until then. |
@@ -385,7 +385,7 @@ ref shown with its target's text.*
 
 **The caret inside a block.** `Enter` puts the caret in the text without changing
 mode; word and line motions work there, and any tree motion leaves it. One
-`Esc` from typing always returns to NORMAL (see §7.6 — this part was two modes
+`Esc` from typing always returns to NORMAL (see §7.7 — this part was two modes
 and a three-step ladder in the previous revision, which was a design error).
 
 ![Caret in a block](dumps/png/22-text-normal-vim.png)
@@ -558,7 +558,71 @@ default would be a guess. From there:
   typing off the screen. The frame above is 60 lines into one, with its fence
   scrolled away and the caret on the line being typed.
 
-### 7.3 Structure edits
+### 7.3 The text layer, and the audit that rewrote it
+
+The text layer was the weakest part of the app, and the honest way to describe it
+is as a table. With the caret in a block — the state the app calls *in block* —
+each of these keys did this:
+
+| key | what it did | what it must do |
+|---|---|---|
+| `dd` | **deleted the block** | delete the line's text |
+| `yy` `p` `P` | yanked/pasted a *block*, and left the text | yank and paste text |
+| `J` | joined with the next *block* | join the next line |
+| `>>` `<` | indented the *block* | shift this line |
+| `u` | global undo: "nothing to undo" | (it should leave, then undo) |
+| `r` `s` `X` `f` `~` `S` | committed the buffer, closed it, and *then* said "no mapping" | a text edit, or a refusal that stays put |
+| `ciw` | `c` waited, `i` became the outline's *insert*, `w` typed itself — **a stray `w` in the sentence** | change the word |
+
+Nine of the fourteen keys committed the buffer and dropped the caret on the way
+to doing something else, and two of them (`dd`, `ciw`) destroyed text the user
+was looking at. The cause is one line of routing: anything the text grammar did
+not handle *fell through* to the outline's verbs. So the grammar could only ever
+grow by accident.
+
+**The contract now.** With the caret in a block, the text grammar owns the keys.
+The outline keeps a short explicit list (`OUTLINE_FROM_TEXT`): the motions that
+leave the block (`j` `k` `h` `l` `gg` `G` `Ctrl-d` `Ctrl-u`), the new-block keys
+(`o` `O`), folds and the block-range selection (`z*`, `v`, `V`), and the
+app-level keys (`Ctrl-P`, `:`, `?`, `u`, `Ctrl-r`, `Ctrl-]`, `[`, `]`, …). **A key
+the grammar does not know is refused**, with a toast, and the caret stays exactly
+where it is. That is the rule that makes the table above impossible to
+reintroduce by accident.
+
+**The grammar.** `Editor::command()` is the single entry point — the router calls
+it, and the tests call it directly, so the grammar is testable without a
+terminal:
+
+* Motions with counts: `w b e W B E 0 ^ $ h l gj gk`, `f F t T` and `;` `,`.
+* Operators `d` `c` `y` over motions, over **text objects** (`iw aw iW aW i" a"`,
+  `i'`, `` i` ``, `i( a(`, `i[ a[`, `i{ a{`), and over themselves (`dd yy cc`) and
+  lines (`dj dk`).
+* Character edits: `x X s r ~`, and `C`/`D` to the line end.
+* Line edits on the *text* line: `dd cc yy p P J >> <<`, plus `Tab`/`Shift-Tab`.
+* A **text register**, separate from the outline's: `yy` then `p` in the same
+  block must not fight with a block yank from the tree.
+* `u` and `Ctrl-r` are deliberately *not* here: leaving the text commits the
+  buffer to the outline's history, and undoing a block-level change with a stale
+  buffer on screen would show you a lie. `u` therefore leaves, then undoes — which
+  is also what vim does after `Esc`.
+* `cw` is `ce`, as in vim: it stops at the end of the word. `dw` eats the space,
+  because that is what `dw` is.
+
+**Paste.** Bracketed paste is now enabled and handled. Before this the event loop
+matched `Event::Key` and dropped everything else, so in a terminal that sends
+`Event::Paste` a paste did *nothing*; in one that does not, a pasted newline
+arrived as Enter — pasting code split the block once per line, and the code-block
+auto-indent then copied the previous line's indentation onto each fragment. A
+paste is now inserted **verbatim**: newlines stay newlines, nothing is
+re-indented, and with no caret in a block it becomes one new block (the whole
+paste, because splitting it per line is a judgement a paste cannot make).
+
+**Where the caret is, is what the keys mean.** The status bar says `in block`, the
+ruler says which line, and the hint bar swaps its whole vocabulary between the two
+domains. That is the app's answer to vim's hardest problem in an outliner: there
+is a text cursor and a block cursor, and no fourth mode to get stuck in.
+
+### 7.4 Structure edits
 
 | Action | Keys | Semantics |
 |---|---|---|
@@ -584,7 +648,7 @@ An empty block that is never filled in is a *session* artifact: it is not
 special-cased in the database, it is simply an empty row that the next save pass
 would drop, and the storage screen counts it ("empty blocks: 1 (transient)").
 
-### 7.4 Visual mode: batching structure edits
+### 7.5 Visual mode: batching structure edits
 
 ![Visual multi-select](dumps/png/10-visual-multiselect.png)
 
@@ -595,7 +659,7 @@ block's previous sibling, `d` soft-deletes them, `u` restores. `V` selects a
 whole subtree (a subtree is contiguous in the flattened rows). This is the
 terminal-native answer to dragging a subtree with a mouse.
 
-### 7.5 Undo
+### 7.6 Undo
 
 `u` pops an `UndoOp`, `Ctrl-r` pushes it back:
 
@@ -615,7 +679,7 @@ would replay; `outl`'s lesson is that **fold state belongs in that log** (so fol
 converge) while **zoom belongs to the client** (so it never syncs). blok keeps
 `collapsed` in the row for now and notes the split.
 
-### 7.6 Vim conformance, and the one place an outliner bends it
+### 7.7 Vim conformance, and the one place an outliner bends it
 
 The brief was "editing should follow VIM convention completely". The only real
 conflict is that vim's model is *lines in a file*, and here the unit is a
@@ -712,7 +776,7 @@ vim's grammar is made visible rather than assumed.
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
 | `?` | the keymap |
 
-**The deviations, stated rather than glossed** (also in §7.6):
+**The deviations, stated rather than glossed** (also in §7.7):
 
 * `hjkl` navigate the *tree*, not a document — there is no document.
 * `Enter` moves the cursor into the block's text in Normal mode rather than down
@@ -869,7 +933,12 @@ Being explicit about this matters more than the demo looking good.
   `typing_in_the_link_chooser_filters_and_leaves_the_block_alone`. Both exist
   because the chooser only appears with two or more links in a block and every
   earlier test had one.
-* The key router is covered by 59 regression tests (`cargo test`), one per bug
+* The text layer is covered by 78 regression tests in total (`cargo test`), one
+  per bug this project has actually shipped. The text grammar has its own unit
+  tests in `editor.rs` (`Editor::command` is testable without a terminal), plus
+  `text_keys_do_text_things_not_outline_things` -- the audit table above, as
+  assertions -- and `deleting_the_line_and_deleting_the_block_are_different_keys`.
+* The key router is covered by the rest, one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -877,7 +946,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 31 frames in this document are the app's own renderer (31 frames, 59
+* All 31 frames in this document are the app's own renderer (31 frames, 78
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

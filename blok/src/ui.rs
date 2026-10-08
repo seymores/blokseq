@@ -1814,41 +1814,61 @@ fn column_title(slice: &[(&str, &str, &str)]) -> String {
     }
 }
 
-fn render_help(f: &mut Frame, app: &App, area: Rect) {
-    let _ = app;
+/// One help column, as lines: a section header, then its keys.
+fn help_column(slice: &[(&'static str, &'static str, &'static str)]) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line> = Vec::new();
+    for (k, d, scope) in slice.iter() {
+        if d.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", k.to_uppercase()),
+                Theme::section_focus(),
+            )));
+            continue;
+        }
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {:<20}", k), Theme::key()),
+            Span::styled(
+                format!("{:<40}", truncate(d, 40)),
+                Theme::panel().fg(theme::FG),
+            ),
+            Span::styled(*scope, Theme::faint()),
+        ]));
+    }
+    lines
+}
+
+/// The keymap: the app's manual, and longer than any pane, so it scrolls.
+/// `j`/`k`, `Ctrl-d`/`Ctrl-u`, `gg`/`G` move the window (`help_scroll`), and the
+/// status bar says which rows are on screen.
+fn render_help(f: &mut Frame, app: &mut App, area: Rect) {
     let cols = Layout::horizontal([Constraint::Percentage(52), Constraint::Percentage(48)]).split(area);
     let split = help_split();
-    for (i, slice) in [&KEYMAP[..split], &KEYMAP[split..]].iter().enumerate() {
-        f.render_widget(
-            panel(&column_title(slice), i == 0, None),
-            cols[i],
-        );
+    let columns = [help_column(&KEYMAP[..split]), help_column(&KEYMAP[split..])];
+    let rows = cols[0].height.saturating_sub(2) as usize;
+    let longest = columns[0].len().max(columns[1].len());
+    // The status bar reads these on the same frame, so it can say which rows of
+    // the manual are on screen without recomputing the layout.
+    app.help_rows = rows;
+    app.help_total = longest;
+    let max_offset = longest.saturating_sub(rows);
+    let offset = app.help_scroll.min(max_offset);
+
+    for (i, lines) in columns.iter().enumerate() {
+        let slice = if i == 0 {
+            &KEYMAP[..split]
+        } else {
+            &KEYMAP[split..]
+        };
+        f.render_widget(panel(&column_title(slice), i == 0, None), cols[i]);
         let inner = Rect {
             x: cols[i].x + 1,
             y: cols[i].y + 1,
             width: cols[i].width.saturating_sub(2),
             height: cols[i].height.saturating_sub(2),
         };
-        let mut lines: Vec<Line> = Vec::new();
-        for (k, d, scope) in slice.iter() {
-            if d.is_empty() {
-                lines.push(Line::from(""));
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", k.to_uppercase()),
-                    Theme::section_focus(),
-                )));
-                continue;
-            }
-            lines.push(Line::from(vec![
-                Span::styled(format!("  {:<20}", k), Theme::key()),
-                Span::styled(
-                    format!("{:<40}", truncate(d, 40)),
-                    Theme::panel().fg(theme::FG),
-                ),
-                Span::styled(*scope, Theme::faint()),
-            ]));
-        }
-        f.render_widget(Paragraph::new(lines).style(Theme::panel()), inner);
+        let window: Vec<Line> = lines.iter().skip(offset).take(rows).cloned().collect();
+        f.render_widget(Paragraph::new(window).style(Theme::panel()), inner);
     }
 }
 
@@ -1917,10 +1937,25 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
             ),
             Theme::statusbar().fg(theme::DIM),
         )),
-        View::Help => spans.push(Span::styled(
-            "Esc goes back",
-            Theme::statusbar().fg(theme::DIM),
-        )),
+        View::Help => {
+            // The renderer filled these in earlier this frame; only it knows how
+            // long the columns are and how many rows fit.
+            let (rows, longest) = (app.help_rows, app.help_total);
+            let offset = app.help_scroll.min(longest.saturating_sub(rows));
+            spans.push(Span::styled(
+                if rows > 0 && longest > rows {
+                    format!(
+                        "rows {}–{} of {} · j/k scroll",
+                        offset + 1,
+                        (offset + rows).min(longest),
+                        longest
+                    )
+                } else {
+                    "Esc goes back".to_string()
+                },
+                Theme::statusbar().fg(theme::DIM),
+            ));
+        }
         View::Sql => {
             let msg = app
                 .sql
@@ -2004,15 +2039,17 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                 ("Esc".into(), "back to the blocks".into()),
             ],
             Focus::Main => match app.view {
+                // The text layer's own manual: what it can do to the *text*.
+                // The outline's verbs are one `Esc` (or `j`) away, and the
+                // "in block" chip is what says which domain the keys are in.
                 View::Journal(_) | View::Page(_) if app.text_focus => vec![
-                    ("j/k".into(), "back to the blocks".into()),
+                    ("Esc".into(), "leave the text".into()),
                     ("w b e 0 $".into(), "move".into()),
-                    ("x dw cw".into(), "delete, change".into()),
-                    ("⏎ i a".into(), "type".into()),
+                    ("iw i(".into(), "objects".into()),
+                    ("dw ciw".into(), "change".into()),
+                    ("dd yy p".into(), "lines".into()),
                     ("Tab".into(), "indent".into()),
-                    ("o".into(), "new block".into()),
-                    ("Ctrl-]".into(), "follow link".into()),
-                    ("Esc".into(), "drop the caret".into()),
+                    ("?".into(), "all keys".into()),
                 ],
                 View::Journal(_) | View::Page(_) => {
                     let mut v: Vec<(String, String)> = Vec::new();
@@ -2062,7 +2099,11 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                     (":sql".into(), "console".into()),
                     ("Esc".into(), "back".into()),
                 ],
-                View::Help => vec![("Esc".into(), "back".into()), ("q".into(), "quit".into())],
+                View::Help => vec![
+                    ("j/k".into(), "scroll".into()),
+                    ("Esc".into(), "back".into()),
+                    ("q".into(), "quit".into()),
+                ],
                 View::Sql => vec![
                     ("⏎".into(), "run".into()),
                     (".tables".into(), "list tables".into()),
@@ -2500,6 +2541,11 @@ mod render_tests {
     }
 
     // ------------------------------------------------------- the caret
+
+    /// Draw, and hand the terminal back for a second look (status line, cursor).
+    fn term_after(app: &mut App, w: u16, h: u16) -> Terminal<TestBackend> {
+        draw(app, w, h)
+    }
 
     fn draw(app: &mut App, w: u16, h: u16) -> Terminal<TestBackend> {
         let mut term = Terminal::new(TestBackend::new(w, h)).expect("terminal");
@@ -2941,5 +2987,50 @@ fn main() { println!(\"[[x]]\"); }
         let term = draw(&mut a, 100, 30);
         let at = term.backend().cursor_position();
         assert_eq!(glyph_at(&term, at.x, at.y), "▏", "command line");
+    }
+
+    /// The keymap is the manual, and it is longer than the pane. It scrolls (and
+    /// says which rows are on screen) rather than quietly clipping its last
+    /// sections, which is what it did at every terminal height.
+    #[test]
+    fn the_manual_scrolls_instead_of_clipping_itself() {
+        let mut a = app("help_scroll");
+        a.set_view(View::Help);
+
+        let top: String = {
+            let term = draw(&mut a, 120, 30);
+            (1..29)
+                .map(|y| row_text(&term, 120, y) + "\n")
+                .collect()
+        };
+        assert!(top.contains("MODES"), "the first section is at the top: {top}");
+        // The left column is the long one; its last section is off the bottom.
+        assert!(
+            !top.contains("INLINE COMPLETION"),
+            "and the last section is not on screen"
+        );
+        assert!(a.help_total > a.help_rows, "the manual is taller than the pane");
+
+        // `G` goes to the end, where the last section lives.
+        a.set_view(View::Help);
+        press(&mut a, 'G');
+        let bottom: String = {
+            let term = draw(&mut a, 120, 30);
+            (1..29)
+                .map(|y| row_text(&term, 120, y) + "\n")
+                .collect()
+        };
+        assert!(
+            bottom.contains("INLINE COMPLETION"),
+            "the last section is reachable: {bottom}"
+        );
+        assert!(!bottom.contains("MODES"));
+        let status = status_line(&term_after(&mut a, 120, 30), 120, 30);
+        assert!(status.contains("j/k scroll"), "the status says where you are: {status}");
+
+        // And `gg` comes back.
+        press(&mut a, 'g');
+        press(&mut a, 'g');
+        assert_eq!(a.help_scroll, 0);
     }
 }

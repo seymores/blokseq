@@ -136,6 +136,47 @@ fn default_db_path() -> PathBuf {
     PathBuf::from(home).join(".blok").join("blok.db")
 }
 
+/// One terminal event. Returns true when the session should end.
+///
+/// This is a function rather than the body of the loop so that the paste path --
+/// the one that used to be dropped on the floor, because the loop matched
+/// `Event::Key` and `continue`d on everything else -- can be tested without a
+/// terminal.
+fn step(app: &mut App, event: Event) -> bool {
+    let k = match event {
+        Event::Key(k) => k,
+        // A bracketed paste is text, not keystrokes: it goes straight into the
+        // buffer, newlines and all, and never becomes Enter.
+        Event::Paste(text) => {
+            app.paste_text(&text);
+            return false;
+        }
+        _ => return false,
+    };
+    if k.kind != KeyEventKind::Press {
+        return false;
+    }
+    if k.modifiers.contains(KeyModifiers::CONTROL) && matches!(k.code, KeyCode::Char('c')) {
+        // Committing first means Ctrl-C during an edit is a save, not a data
+        // loss. The prune pass at the end still runs.
+        app.commit_edit();
+        return true;
+    }
+    // Ctrl-S is the one global that is not a vim binding: a snapshot is an
+    // application concern, not a text one. Everything else -- panels, views,
+    // prune, backup -- goes through the keymap or `:`.
+    if k.modifiers.contains(KeyModifiers::CONTROL) && matches!(k.code, KeyCode::Char('s')) {
+        // Commit first: a snapshot that is missing the line you just typed is
+        // not a snapshot of your work.
+        app.commit_edit();
+        app.do_backup();
+        app.view = app::View::Backup;
+        return false;
+    }
+    app.handle_key(k);
+    app.quit
+}
+
 fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let db = open_or_explain(db_path)?;
     let today = db::today();
@@ -144,6 +185,14 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     app.db.refresh_stats();
 
     let mut terminal = ratatui::init();
+    // Ask the terminal to send a paste as one event instead of a burst of
+    // keystrokes. Without this a pasted newline is *Enter*: pasting code split
+    // the block per line, and each line got the previous line's indentation
+    // copied onto it by the code-block auto-indent.
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::EnableBracketedPaste
+    );
 
     // Ask the terminal to disambiguate the keys that share a control byte under
     // the legacy encoding: Ctrl-M/Enter, Ctrl-I/Tab, Ctrl-H/Backspace,
@@ -165,28 +214,7 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
         loop {
             terminal.draw(|f| ui::render(f, &mut app))?;
-            let Event::Key(k) = event::read()? else {
-                continue;
-            };
-            if k.kind != KeyEventKind::Press {
-                continue;
-            }
-            if k.modifiers.contains(KeyModifiers::CONTROL) && matches!(k.code, KeyCode::Char('c')) {
-                // Committing first means Ctrl-C during an edit is a save, not a
-                // data loss. The prune pass at the end still runs.
-                app.commit_edit();
-                break;
-            }
-            // Ctrl-S is the one global that is not a vim binding: a snapshot is
-            // an application concern, not a text one. Everything else -- panels,
-            // views, prune, backup -- goes through the keymap or `:`.
-            if k.modifiers.contains(KeyModifiers::CONTROL) && matches!(k.code, KeyCode::Char('s')) {
-                app.do_backup();
-                app.view = app::View::Backup;
-                continue;
-            }
-            app.handle_key(k);
-            if app.quit {
+            if step(&mut app, event::read()?) {
                 break;
             }
         }
@@ -195,6 +223,10 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     if enhanced {
         let _ = crossterm::execute!(std::io::stdout(), crossterm::event::PopKeyboardEnhancementFlags);
     }
+    let _ = crossterm::execute!(
+        std::io::stdout(),
+        crossterm::event::DisableBracketedPaste
+    );
     ratatui::restore();
     // Quitting is a save point: prune the days that were never written to.
     app.prune_journals();
@@ -304,4 +336,74 @@ fn demo_lifecycle(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         writeln!(out, "        {}  {}", k, n)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyEvent, KeyModifiers};
+    use std::path::PathBuf;
+
+    fn app(name: &str) -> App {
+        let path: PathBuf = std::env::temp_dir().join(format!(
+            "blok-main-{}-{}.db",
+            std::process::id(),
+            name
+        ));
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{}", path.display(), suffix));
+        }
+        let db = crate::db::Db::open(&path).expect("open test db");
+        let today = crate::db::today();
+        let mut app = App::new(db, today);
+        let page = app.db.ensure_page("Test Page", crate::model::PageKind::Page);
+        app.db.create_block(page.id, None, None, "first block");
+        app.goto_page("Test Page");
+        app
+    }
+
+    /// The paste path, end to end: the event is *handled*, not dropped. The bug
+    /// was that the loop matched `Event::Key` and threw everything else away, so
+    /// in a terminal that sends bracketed paste, pasting did nothing at all.
+    #[test]
+    fn a_paste_event_reaches_the_buffer_verbatim() {
+        let mut a = app("paste_event");
+        a.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        assert!(!step(&mut a, Event::Paste("one\ntwo".into())));
+        let ed = a.editor.as_ref().expect("still editing");
+        assert_eq!(
+            ed.text(),
+            "one\ntwofirst block",
+            "the paste is verbatim, and a pasted newline is a newline"
+        );
+
+        // And Enter is still Enter.
+        step(&mut a, Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
+        assert!(!a.text_focus);
+    }
+
+    /// Ctrl-S snapshots the buffer you are typing in, not the last commit.
+    #[test]
+    fn ctrl_s_commits_before_it_snapshots() {
+        let mut a = app("ctrl_s");
+        a.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        a.handle_key(KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE));
+        a.handle_key(KeyEvent::new(KeyCode::Char('!'), KeyModifiers::NONE));
+
+        step(
+            &mut a,
+            Event::Key(KeyEvent::new(
+                KeyCode::Char('s'),
+                KeyModifiers::CONTROL,
+            )),
+        );
+        assert_eq!(a.view, app::View::Backup);
+        let id = a.rows[0].id;
+        assert_eq!(
+            a.db.block(id).map(|b| b.content),
+            Some("first block!".to_string()),
+            "the line being typed is in the snapshot"
+        );
+    }
 }

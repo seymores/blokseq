@@ -25,18 +25,18 @@
 │  u / Ctrl-r          undo / redo                             Any      ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
 │  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
 │                                                                       ││                                                                 │
-│  TEXT MOTIONS                                                         ││                                                                 │
+│  THE TEXT LAYER                                                       ││                                                                 │
 │  w b e 0 ^ $         word and line motions inside one block  Text     ││                                                                 │
-│  x dw d$ D           delete char · word · to line end        Text     ││                                                                 │
-│  cw ciw C            change word · to line end               Text     ││                                                                 │
+│  f t F T ; ,         find a character on this line, and repe…Text     ││                                                                 │
+│  iw aw i" a" i(      text objects: word · quoted · bracketed Text     ││                                                                 │
+│  x X s r ~           delete · backspace · substitute · repla…Text     ││                                                                 │
+│  dw de db d0 d$      delete by motion (`dw` eats the space, …Text     ││                                                                 │
+│  cw ciw c$ C         change: a motion, a text object, to lin…Text     ││                                                                 │
+│  dd yy p P           the line's *text* -- the block's verbs …Text     ││                                                                 │
+│  J >> <<             join the next line · shift this line    Text     ││                                                                 │
+│  u / Ctrl-r          undo / redo: leaving the text commits i…Text     ││                                                                 │
+│  Esc                 leave the text; the outline's verbs com…Text     ││                                                                 │
 │  Ctrl-w / Ctrl-u     delete word / to line start             Insert   ││                                                                 │
-│  ⏎ in a fence        newline, indented like the line above   Insert   ││                                                                 │
-│  ↑ ↓ · gj gk         move between the lines of one block     Normal, I││                                                                 │
-│                                                                       ││                                                                 │
-│  INLINE COMPLETION                                                    ││                                                                 │
-│  /                   slash commands inside a block           Insert   ││                                                                 │
-│  [[ (( #             page link · block ref · tag             Insert   ││                                                                 │
-│                                                                       ││                                                                 │
 ╰───────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
- NORMAL  Esc goes back
- Esc back   q quit
+ NORMAL  rows 1–38 of 45 · j/k scroll
+ j/k scroll   Esc back   q quit

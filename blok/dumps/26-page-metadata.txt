@@ -1,7 +1,7 @@
 ╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────╮╭ PAGE METADATA  2 refs ───────────────╮
 │ ▾ Deep work 09:00–12:30 on the block store                                                       ││ kind       journal                   │
-│ │ • Replaced the integer  position  with a fractional index                                      ││ created    2026-10-08 23:03          │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││ updated    2026-10-08 23:03          │
+│ │ • Replaced the integer  position  with a fractional index                                      ││ created    2026-10-08 23:43          │
+│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││ updated    2026-10-08 23:43          │
 │▌▾ Standup — [[Project Aurora]] ↗1                                                                ││ blocks     12 blocks                 │
 │ │ • Export format settled: the SQLite file *is* the format                                       ││ links      2 in · 6 out              │
 │ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                                          ││ properties none                      │

@@ -25,7 +25,7 @@ cargo run -- --db ./scratch.db        # use a throwaway database
 cargo run -- --dump dumps             # re-render every mockup frame
 cargo run -- --demo-lifecycle         # print the journal create/prune trace
 cargo run -- --stats                  # row counts, FTS5 availability, integrity
-cargo test                            # 59 regression tests, one per bug
+cargo test                            # 78 regression tests, one per bug
 ```
 
 Dependencies: `ratatui` 0.30, `crossterm` 0.29, `rusqlite` 0.40 (`bundled`, so
@@ -78,11 +78,13 @@ a block's text (press `Enter`) and still be in NORMAL, and any tree motion leave
 it, so the text cursor is a position rather than a fourth mode you can get stuck
 in. `Ctrl-]` or `gf` follows a link (`↗N` marks the blocks that have them),
 `[`/`]` (and `Ctrl-o`/`Ctrl-i`) walk back and forward through the pages you have
-opened, `Tab` indents the line the caret is on (the block, from the tree),
-`dd`/`yy`/`p` operate on whole subtrees,
+opened, `Tab` indents the line the caret is on (the block, from the tree), and
+the keys mean the *text* while the caret is in a block — `dd` the line, `ciw` the
+word, `dd` again the block once you `Esc` out. From the tree `dd`/`yy`/`p`
+operate on whole subtrees,
 `u`/`Ctrl-r` undo and redo, and everything app-level is a `:` command (`:e`,
 `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
-are listed in [DESIGN.md §7.5](DESIGN.md).
+are listed in [DESIGN.md §7.7](DESIGN.md).
 
 **Getting around** is one key: `Ctrl-P` opens **Find** — with no query it lists
 what you touched last, and as you type it searches page names *and* block text,

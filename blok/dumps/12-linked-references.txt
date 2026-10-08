@@ -1,7 +1,7 @@
 ╭ Project Aurora  12 blocks · 2 refs ──────────────────────────────────────────────────────────────╮╭ PAGE METADATA  2 refs ───────────────╮
 │ ▾ Project Aurora — offline-first note sync for field teams                                       ││ kind       page                      │
-│ │ • Constraint: laptops on 2G links for weeks at a time                                          ││ created    2026-10-08 23:03          │
-│ │ • Decision: ship the SQLite file as the export format, not markdown                            ││ updated    2026-10-08 23:03          │
+│ │ • Constraint: laptops on 2G links for weeks at a time                                          ││ created    2026-10-08 23:43          │
+│ │ • Decision: ship the SQLite file as the export format, not markdown                            ││ updated    2026-10-08 23:43          │
 │ │ • Rejected: markdown tree — 4k files, slow rename, no transactions                             ││ blocks     12 blocks                 │
 │ ▾ Milestones                                                                                     ││ links      2 in · 2 out              │
 │ │ • TODO Single-file export + import round-trip                                                  ││ owner      Dana                      │

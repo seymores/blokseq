@@ -208,6 +208,14 @@ pub struct App {
     pub undo: Vec<UndoOp>,
     pub redo: Vec<UndoOp>,
 
+    /// How far down the keymap screen is scrolled. The manual is longer than
+    /// any pane, so it scrolls instead of quietly clipping its own last
+    /// sections -- which is what it did before, at every terminal height.
+    pub help_scroll: usize,
+    /// How many rows of the manual fit, and how many there are. Filled in by the
+    /// renderer, read by the status bar on the same frame.
+    pub help_rows: usize,
+    pub help_total: usize,
     /// The page-metadata panel: metadata, linked and unlinked references. Off by
     /// default -- it is something you ask for with `Ctrl-M` (or `gm`), not
     /// furniture you live with.
@@ -275,6 +283,9 @@ impl App {
             link_menu: Vec::new(),
             prune_on_quit: true,
             visual: None,
+            help_scroll: 0,
+            help_rows: 0,
+            help_total: 0,
             history: Vec::new(),
             history_forward: Vec::new(),
             undo: Vec::new(),
@@ -412,6 +423,10 @@ impl App {
     // ------------------------------------------------------------- view nav
 
     pub fn set_view(&mut self, v: View) {
+        if matches!(v, View::Help) {
+            // Open the manual at the top, not wherever it was left.
+            self.help_scroll = 0;
+        }
         if v != self.view && !matches!(v, View::Help) {
             self.prev_view = Some(self.view.clone());
         }
@@ -596,6 +611,11 @@ impl App {
     /// typists; otherwise we drop to normal mode on the same block.
     pub fn commit_edit(&mut self) {
         let Some(ed) = self.editor.take() else { return };
+        // With the buffer gone there is no caret in any text, so the flag that
+        // says there is has to go too. Leaving it set is a lock-out: the router
+        // reads `text_focus` first, finds no editor, and refuses every key that
+        // is not an app-level one.
+        self.text_focus = false;
         if !ed.dirty {
             self.mode = Mode::Normal;
             self.popup = None;
@@ -861,6 +881,65 @@ impl App {
         if let Some(ed) = self.editor.as_mut() {
             ed.insert_char('\n');
         }
+    }
+
+    /// A bracketed paste, verbatim.
+    ///
+    /// The one rule is that a paste is *text*, not keystrokes: a pasted newline
+    /// must not mean Enter (which would split the block per line, and in a code
+    /// block would auto-indent every pasted line on top of its own indentation).
+    /// With the caret in a block it lands in that block; with no caret in a
+    /// block it becomes a new block below the selection.
+    pub fn paste_text(&mut self, text: &str) {
+        // CRLF from a file or a terminal, and no other control characters: a
+        // stray ESC in a paste must not become a keypress later.
+        let cleaned: String = text
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
+            .chars()
+            .filter(|c| *c == '\n' || *c == '\t' || !c.is_control())
+            .collect();
+        if cleaned.is_empty() {
+            return;
+        }
+        const LIMIT: usize = 100_000;
+        let (body, capped) = if cleaned.chars().count() > LIMIT {
+            (cleaned.chars().take(LIMIT).collect::<String>(), true)
+        } else {
+            (cleaned, false)
+        };
+
+        if self.editor.is_some() {
+            if let Some(ed) = self.editor.as_mut() {
+                ed.insert_str(&body);
+            }
+            self.refresh_popup();
+        } else {
+            // No caret in a block: a new block under the selection, with the
+            // whole paste in it. Splitting it into one block per line would be a
+            // judgement about the content that a paste cannot make.
+            self.new_block_below();
+            if let Some(ed) = self.editor.as_mut() {
+                ed.insert_str(body.trim_end_matches('\n'));
+            }
+            self.refresh_popup();
+        }
+        let lines = body.lines().count().max(1);
+        self.toast(
+            ToastKind::Info,
+            if capped {
+                "pasted (truncated at 100k characters)"
+            } else {
+                "pasted"
+            },
+            Some(&format!(
+                "{} line{} · {} character{}",
+                lines,
+                plural(lines),
+                body.chars().count(),
+                plural(body.chars().count())
+            )),
+        );
     }
 
     // --------------------------------------------------------------- popups
@@ -1389,6 +1468,16 @@ impl App {
                     self.mode = Mode::Normal;
                 }
             }
+            // App-level keys work while typing too, and they commit first: a
+            // navigation that loses the line you were typing is not navigation.
+            KeyCode::Char('p') if ctrl => {
+                self.commit_edit();
+                self.open_palette();
+            }
+            KeyCode::Char('m') if ctrl => {
+                self.commit_edit();
+                self.toggle_meta();
+            }
             KeyCode::Char('w') if ctrl => {
                 if let Some(ed) = self.editor.as_mut() {
                     ed.delete_word();
@@ -1618,13 +1707,21 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("J", "join this block with the one below", "Normal"),
     ("u / Ctrl-r", "undo / redo", "Any"),
     ("za zc zo zR zM", "fold · close · open · all open · all closed", "Normal"),
-    ("Text motions", "", ""),
+    ("The text layer", "", ""),
     ("w b e 0 ^ $", "word and line motions inside one block", "Text"),
-    ("x dw d$ D", "delete char · word · to line end", "Text"),
-    ("cw ciw C", "change word · to line end", "Text"),
+    ("f t F T ; ,", "find a character on this line, and repeat it", "Text"),
+    ("iw aw i\" a\" i(", "text objects: word · quoted · bracketed", "Text"),
+    ("x X s r ~", "delete · backspace · substitute · replace · case", "Text"),
+    ("dw de db d0 d$", "delete by motion (`dw` eats the space, `cw` does not)", "Text"),
+    ("cw ciw c$ C", "change: a motion, a text object, to line end", "Text"),
+    ("dd yy p P", "the line's *text* -- the block's verbs are the tree's", "Text"),
+    ("J >> <<", "join the next line · shift this line", "Text"),
+    ("u / Ctrl-r", "undo / redo: leaving the text commits it first", "Text"),
+    ("Esc", "leave the text; the outline's verbs come back", "Text"),
     ("Ctrl-w / Ctrl-u", "delete word / to line start", "Insert"),
     ("⏎ in a fence", "newline, indented like the line above", "Insert"),
     ("↑ ↓ · gj gk", "move between the lines of one block", "Normal, Insert"),
+    ("a paste", "bracketed paste is text: newlines stay in the block", "Any"),
     ("Inline completion", "", ""),
     ("/", "slash commands inside a block", "Insert"),
     ("[[ (( #", "page link · block ref · tag", "Insert"),

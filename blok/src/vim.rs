@@ -28,6 +28,27 @@ use crate::app::{
 use crate::editor::Mode;
 use crate::model::JournalDay;
 
+/// Keys that act on the *outline* even while the caret is in a block's text.
+///
+/// Everything else belongs to the text grammar, and a key the text grammar does
+/// not know is **refused** rather than handed to the outline. That is the whole
+/// point of the list: seventeen vim text keys used to fall through from inside a
+/// block, so `dd` deleted the block you were typing in, `p` pasted a block, `u`
+/// undid something unrelated, and `ciw` -- `c` waits, `i` became the outline's
+/// insert, `w` then typed itself -- left a stray `w` in the sentence.
+const OUTLINE_FROM_TEXT: &[&str] = &[
+    // Motions that leave the block: the caret's position decides the domain,
+    // and `j`/`k` being a one-key escape is a documented deviation.
+    "j", "k", "h", "l", "gg", "G", "C-d", "C-u",
+    // New blocks: the outline's line.
+    "o", "O",
+    // Folds, and the block-range selection.
+    "za", "zc", "zo", "zR", "zM", "v", "V",
+    // Links, history, panels, views, search, commands, help, undo.
+    "C-]", "gf", "C-o", "C-i", "[", "]", "C-p", "/", "?", ":", "u", "C-r",
+    "C-wl", "C-ww", "C-m", "gm", "n", "N", "ZZ", "ZQ", "C-s",
+];
+
 impl App {
     // ------------------------------------------------------------- helpers
 
@@ -97,7 +118,6 @@ impl App {
                 InsertAt::Start => ed.cursor = 0,
                 InsertAt::After | InsertAt::End => ed.cursor = ed.chars.len(),
             }
-            ed.mode = Mode::Insert;
         }
         self.mode = Mode::Insert;
     }
@@ -1129,6 +1149,67 @@ impl App {
             return;
         }
         let Some(name) = key_name(k, ctrl) else { return };
+
+        // With the caret in a block, the text grammar owns the keys. The
+        // `editor` half of the test matters: `text_focus` with no buffer is not a
+        // state the router may act on.
+        if self.text_focus && self.editor.is_some() {
+            let seq = format!("{}{}", self.pending, name);
+            let outcome = self
+                .editor
+                .as_mut()
+                .map(|ed| ed.command(&seq))
+                .unwrap_or(crate::editor::Outcome::Unknown);
+            match outcome {
+                crate::editor::Outcome::Done => {
+                    self.pending.clear();
+                }
+                crate::editor::Outcome::Insert => {
+                    self.pending.clear();
+                    self.mode = Mode::Insert;
+                }
+                crate::editor::Outcome::DropCaret => {
+                    self.pending.clear();
+                    self.leave_text();
+                }
+                crate::editor::Outcome::Quit => {
+                    self.pending.clear();
+                    self.quit_now(true, false);
+                }
+                crate::editor::Outcome::Incomplete => {
+                    self.pending = seq;
+                }
+                crate::editor::Outcome::Unknown => {
+                    if OUTLINE_FROM_TEXT.contains(&seq.as_str()) {
+                        self.pending.clear();
+                        self.leave_text();
+                        if !self.tree_command(&seq) {
+                            self.unknown_key(&seq);
+                        }
+                    } else if OUTLINE_FROM_TEXT
+                        .iter()
+                        .any(|k| k.len() > seq.len() && k.starts_with(&seq))
+                    {
+                        // A prefix of an outline verb: `z` before `za`, `C-w`
+                        // before `C-wl`. Wait for the rest instead of refusing a
+                        // key that was going somewhere.
+                        self.pending = seq;
+                    } else {
+                        self.pending.clear();
+                        // Refuse, and stay where the caret is. The old failure
+                        // mode was to commit, close the buffer and *then* say
+                        // there was no mapping for `r`.
+                        self.toast(
+                            ToastKind::Warn,
+                            &format!("no text mapping for \"{}\"", seq),
+                            Some("Esc leaves the block · ? keymap"),
+                        );
+                    }
+                }
+            }
+            return;
+        }
+
         if !self.pending.is_empty() {
             let seq = format!("{}{}", self.pending, name);
             self.pending.clear();
@@ -1155,6 +1236,40 @@ impl App {
 
     /// Returns true when the key was consumed.
     pub fn tree_command(&mut self, seq: &str) -> bool {
+        // The keymap is the manual, and longer than any pane, so `j`/`k` and
+        // friends scroll it. This lives here rather than in the router because
+        // `gg` arrives as a *pending* sequence, not as a single key.
+        if self.view == View::Help {
+            match seq {
+                "j" => {
+                    self.help_scroll = self.help_scroll.saturating_add(1);
+                    return true;
+                }
+                "k" => {
+                    self.help_scroll = self.help_scroll.saturating_sub(1);
+                    return true;
+                }
+                "C-d" => {
+                    self.help_scroll = self.help_scroll.saturating_add(12);
+                    return true;
+                }
+                "C-u" => {
+                    self.help_scroll = self.help_scroll.saturating_sub(12);
+                    return true;
+                }
+                "gg" => {
+                    self.help_scroll = 0;
+                    return true;
+                }
+                "G" => {
+                    // Clamped where it is drawn, because only the renderer knows
+                    // how long the columns are.
+                    self.help_scroll = usize::MAX / 2;
+                    return true;
+                }
+                _ => {}
+            }
+        }
         // Focus decides what the same keys mean, exactly like vim windows.
         if self.focus == Focus::Right {
             match seq {
@@ -1208,14 +1323,6 @@ impl App {
                 _ => {}
             }
         }
-        // With the caret inside a block, vim's text grammar applies first.
-        // Anything it does not handle leaves the text and runs as a tree
-        // command, which is what makes `j` (or any other motion) a one-key
-        // escape from the block's text.
-        if self.text_focus && self.text_op(seq) {
-            return true;
-        }
-        self.leave_text();
         match seq {
             "j" => self.move_selection(1),
             "k" => self.move_selection(-1),
@@ -1291,94 +1398,6 @@ impl App {
     /// Vim's text grammar, applied to the block the caret is in. Returns false
     /// for anything that is not a text operation, so the caller can treat the
     /// key as a tree command instead.
-    fn text_op(&mut self, seq: &str) -> bool {
-        if self.editor.is_none() {
-            return false;
-        }
-        let mut start_inserting = false;
-        let mut drop_caret = false;
-        let mut quit = false;
-        {
-            let ed = self.editor.as_mut().unwrap();
-            match seq {
-                "h" => ed.left(),
-                "l" => ed.right(),
-                // Tab is indentation while the caret is in the text, and a
-                // structural re-indent (">>") only from the tree. `>>` still
-                // indents the block from here, because it says so.
-                "<Tab>" => ed.indent(),
-                "<S-Tab>" => ed.dedent(),
-                "w" => ed.word_right(),
-                "b" => ed.word_left(),
-                "e" => ed.word_end(),
-                // vim's display-line motions, which here are the only way to
-                // move *within* a block without leaving it.
-                "gj" => {
-                    ed.line_down();
-                }
-                "gk" => {
-                    ed.line_up();
-                }
-                "0" => ed.home(),
-                "^" => ed.first_non_blank(),
-                "$" => ed.end(),
-                "x" => ed.delete_char(),
-                "D" | "d$" => ed.delete_to_end(),
-                "dw" => ed.delete_word(),
-                "d0" => {
-                    let mut home = ed.cursor;
-                    while home > 0 && ed.chars[home - 1] != '\n' {
-                        home -= 1;
-                    }
-                    ed.chars.drain(home..ed.cursor);
-                    ed.cursor = home;
-                    ed.dirty = true;
-                }
-                "cw" | "ciw" => {
-                    ed.change_word();
-                    start_inserting = true;
-                }
-                "C" => {
-                    ed.change_to_end();
-                    start_inserting = true;
-                }
-                "i" => start_inserting = true,
-                "a" => {
-                    ed.right();
-                    start_inserting = true;
-                }
-                "I" => {
-                    ed.home();                    start_inserting = true;
-                }
-                "A" => {
-                    ed.end();
-                    start_inserting = true;
-                }
-                // In a block, Enter means "start typing here" -- `o` is the
-                // key that opens a new block, and the hint bar says so.
-                "<CR>" => start_inserting = true,
-                "<Esc>" => drop_caret = true,
-                // Same as everywhere in Normal mode: `q` quits.
-                "q" => quit = true,
-                _ => return false,
-            }
-        }
-        if quit {
-            self.quit_now(true, false);
-            return true;
-        }
-        if start_inserting {
-            if let Some(ed) = self.editor.as_mut() {
-                ed.mode = Mode::Insert;
-            }
-            self.mode = Mode::Insert;
-        }
-        if drop_caret {
-            self.leave_text();
-        }
-        true
-    }
-
     pub fn visual_key(&mut self, k: KeyEvent, ctrl: bool) {
         let Some(name) = key_name(k, ctrl) else { return };
         match name.as_str() {
@@ -2272,5 +2291,196 @@ mod tests {
             View::Page("Test Page".into()),
             "Esc cancels the chooser; it does not follow anything"
         );
+    }
+
+    /// The contract of the text layer, as a table.
+    ///
+    /// Every row is a bug that shipped. The audit that produced it put the caret
+    /// in a block and pressed one vim text key: `dd` deleted the block, `yy`
+    /// yanked the block, `p` pasted one, `>>` indented the block, `u` undid
+    /// something else, `v` started a block selection, and `r`/`s`/`f`/`X`/`~`
+    /// committed the buffer, closed it, and *then* said "no mapping".
+    #[test]
+    fn text_keys_do_text_things_not_outline_things() {
+        // (keys, buffer afterwards, still in the text?, block count)
+        let cases: &[(&str, &str, bool, usize)] = &[
+            ("dd", "", true, 2),                       // the line's text, not the block
+            ("yy", "first block", true, 2),            // yank, do not leave
+            ("yyp", "first block\nfirst block", true, 2),
+            ("ciw", " block", true, 2),                // no stray `w`
+            ("rX", "Xirst block", true, 2),
+            ("~", "First block", true, 2),
+            ("X", "first block", true, 2),
+            ("x", "irst block", true, 2),
+            ("dw", "block", true, 2),
+            ("d$", "", true, 2),
+            (">>", "  first block", true, 2),
+            ("fa", "first block", true, 2),            // a find, not a no-mapping toast
+            ("Q", "first block", true, 2),             // unknown: refused, NOT ejected
+            ("zq", "first block", true, 2),            // ...and neither is this
+            // The outline keys still leave: the caret's position decides.
+            ("j", "first block", false, 2),
+            // `o` opens a new block *and* puts the caret in it, so the buffer
+            // afterwards is the new, empty one.
+            ("o", "", false, 3),
+            ("v", "first block", false, 2),
+            ("u", "first block", false, 2),
+        ];
+        for (keys, buffer, in_text, blocks) in cases {
+            let mut a = app(&format!("text_keys_{}", keys.replace(['$', '>', '~'], "x")));
+            code(&mut a, KeyCode::Enter); // caret into the block
+            assert!(a.text_focus, "{keys}: the caret starts in the text");
+            for c in keys.chars() {
+                key(&mut a, c);
+            }
+            assert_eq!(
+                a.text_focus, *in_text,
+                "{keys}: text_focus was {} (buffer {:?})",
+                a.text_focus,
+                a.editor.as_ref().map(|e| e.text())
+            );
+            assert_eq!(a.rows.len(), *blocks, "{keys}: block count");
+            if let Some(ed) = a.editor.as_ref() {
+                assert_eq!(ed.text(), *buffer, "{keys}: the buffer");
+            } else {
+                assert_eq!(*buffer, "first block", "{keys}: no buffer left");
+            }
+        }
+    }
+
+    /// `dd` empties the line it is on. The *block* delete is the tree's, one
+    /// `Esc` (or `j`) away -- and the hint bar and the ruler are what tell you
+    /// which domain you are in.
+    #[test]
+    fn deleting_the_line_and_deleting_the_block_are_different_keys() {
+        let mut a = app("dd_domains");
+        code(&mut a, KeyCode::Enter);
+        key(&mut a, 'd');
+        key(&mut a, 'd');
+        assert_eq!(a.rows.len(), 2, "the caret was in the text: the line went");
+        assert!(a.editor.is_some());
+
+        // Same keys, caret in the tree.
+        let mut a = app("dd_tree");
+        key(&mut a, 'd');
+        key(&mut a, 'd');
+        assert_eq!(a.rows.len(), 1, "the caret was in the tree: the block went");
+    }
+
+    /// A paste is text, not keystrokes. Before bracketed paste was handled the
+    /// loop threw `Event::Paste` away entirely, so pasting did nothing at all in
+    /// a terminal that sends it -- and in one that does not, a pasted newline
+    /// arrived as Enter, so pasting code split the block per line and the
+    /// auto-indent copied the previous line's indentation onto each one.
+    #[test]
+    fn a_paste_is_text_and_not_keystrokes() {
+        let mut a = app("paste_text");
+        code(&mut a, KeyCode::Enter);
+        let id = a.rows[0].id;
+        a.paste_text("fn main() {\n    let x = 1;\n}\n");
+
+        let ed = a.editor.as_ref().expect("still editing");
+        // Enter put the caret at the first non-blank, so the paste lands at the
+        // front: what matters is that it is *verbatim*, not where the caret is.
+        assert_eq!(
+            ed.text(),
+            "fn main() {\n    let x = 1;\n}\nfirst block",
+            "verbatim, newlines and all"
+        );
+        assert!(
+            !ed.text().contains("\n    fn main"),
+            "and no auto-indent was added to the pasted lines"
+        );
+
+        // And it commits as one block with real newlines in it.
+        code(&mut a, KeyCode::Esc);
+        assert_eq!(a.rows.len(), 2, "a paste does not split blocks");
+        let content = a.db.block(id).map(|b| b.content).unwrap_or_default();
+        assert!(content.contains("\n    let x = 1;\n"), "{content:?}");
+    }
+
+    /// With no caret in a block, a paste becomes a block -- the whole paste in
+    /// it, because splitting it into one block per line is a judgement about the
+    /// content that a paste cannot make.
+    #[test]
+    fn a_paste_with_no_caret_opens_a_block() {
+        let mut a = app("paste_block");
+        assert!(a.editor.is_none());
+        a.paste_text("one\ntwo\nthree");
+        assert_eq!(a.rows.len(), 3);
+        let ed = a.editor.as_ref().expect("the new block is being edited");
+        assert_eq!(ed.text(), "one\ntwo\nthree");
+        code(&mut a, KeyCode::Esc);
+        // The new block goes under the selection, so it is not necessarily last.
+        let id = a
+            .rows
+            .iter()
+            .find(|r| r.content.contains("one"))
+            .map(|r| r.id)
+            .expect("the pasted block");
+        assert_eq!(
+            a.db.block(id).map(|b| b.content),
+            Some("one\ntwo\nthree".to_string())
+        );
+    }
+
+    /// Ctrl-P while typing: commit and go, rather than doing nothing and taking
+    /// the uncommitted line with it.
+    #[test]
+    fn app_keys_work_while_typing_and_commit_first() {
+        let mut a = app("insert_ctrl_p");
+        code(&mut a, KeyCode::Enter);
+        let id = a.rows[0].id;
+        key(&mut a, 'A'); // append at the end of the block's text
+        for c in " tail".chars() {
+            key(&mut a, c);
+        }
+        ctrl(&mut a, 'p');
+        assert!(a.palette.is_some(), "Ctrl-P opened Find from INSERT");
+        assert!(a.editor.is_none(), "and the buffer was committed, not dropped");
+        let content = a.db.block(id).map(|b| b.content).unwrap_or_default();
+        assert_eq!(content, "first block tail");
+
+        // Ctrl-M is the panel toggle, and it commits too.
+        code(&mut a, KeyCode::Esc);
+        code(&mut a, KeyCode::Enter);
+        key(&mut a, 'A');
+        key(&mut a, '!');
+        ctrl(&mut a, 'm');
+        assert!(a.show_meta);
+        assert_eq!(
+            a.db.block(id).map(|b| b.content),
+            Some("first block tail!".to_string())
+        );
+    }
+
+    /// `Ctrl-P` while typing commits the buffer, and committing closes it. If
+    /// `text_focus` survived that, the caret counted as being in text that no
+    /// longer existed: the router reads the flag first, finds no buffer, and
+    /// refuses every key that is not app-level. Find, Esc, and then nothing
+    /// works -- not even Enter to get back into the block.
+    #[test]
+    fn committing_without_reopening_clears_the_caret_in_text() {
+        let mut a = app("stale_focus");
+        code(&mut a, KeyCode::Enter);
+        let id = a.rows[0].id;
+        key(&mut a, 'A');
+        key(&mut a, '!');
+        ctrl(&mut a, 'p');
+        assert!(a.editor.is_none(), "Ctrl-P committed the buffer");
+        assert!(!a.text_focus, "and there is no caret in any text now");
+        code(&mut a, KeyCode::Esc); // close Find
+        code(&mut a, KeyCode::Enter); // back into the block
+        assert!(a.editor.is_some(), "Enter still opens the block");
+        assert!(a.text_focus);
+        // Normal mode in the text: `y` is an operator now, so type with `A`.
+        key(&mut a, 'A');
+        key(&mut a, 'y');
+        assert!(
+            a.editor.as_ref().unwrap().text().ends_with('y'),
+            "and typing reaches the buffer again"
+        );
+        code(&mut a, KeyCode::Esc);
+        assert!(a.db.block(id).map(|b| b.content).unwrap_or_default().contains('!'));
     }
 }
