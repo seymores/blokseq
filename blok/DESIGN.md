@@ -559,6 +559,7 @@ Normal modes because a block can itself hold several lines:
 | `/` `n` `N` | search the graph · next · previous match |
 | `Ctrl-n` `Ctrl-b` | show / hide the sidebar · the linked references |
 | `Ctrl-S` | snapshot, then the storage screen |
+| `q` `ZZ` `ZQ` `:q` | quit · snapshot-and-quit · quit without pruning · quit |
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
 | `?` | the keymap |
 
@@ -664,7 +665,11 @@ Being explicit about this matters more than the demo looking good.
   outdent, reorder, soft delete, fold, undo of the last three of those.
 * `VACUUM INTO` snapshots while the database is open, `backup_log` history, the
   integrity check, and `wal_checkpoint` before measuring.
-* All 22 frames in this document are the app's own renderer.
+* The key router is covered by 10 regression tests (`cargo test`): `q`, `ZZ`,
+  `ZQ` and `:q` all end the session; `Esc` walks the vim ladder; `dd` + `u`
+  round-trips a block; `Ctrl-]` follows a link; panel toggles persist; the
+  console refuses a `DELETE`.
+* All 28 frames in this document are the app's own renderer.
 
 **Mocked or stubbed (and flagged as such):**
 

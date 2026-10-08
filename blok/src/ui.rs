@@ -1439,10 +1439,11 @@ fn render_query(f: &mut Frame, app: &mut App, area: Rect) {
     for (i, status) in ["TODO", "DOING", "DONE"].iter().enumerate() {
         let hits = app.by_status(status);
         let color = theme::status_color(status);
+        let focused = i == app.query_col;
         f.render_widget(
             panel(
                 status,
-                i == 0,
+                focused,
                 Some(Span::styled(format!(" {} ", hits.len()), Theme::section().fg(color))),
             ),
             cols[i],
@@ -1457,7 +1458,7 @@ fn render_query(f: &mut Frame, app: &mut App, area: Rect) {
         if hits.is_empty() {
             lines.push(Line::from(Span::styled("empty", Theme::dim().fg(theme::FAINT))));
         }
-        for h in hits.iter().take(inner.height as usize - 1) {
+        for (n, h) in hits.iter().take(inner.height as usize - 1).enumerate() {
             let badge = if h.is_journal {
                 crate::model::parse_journal_key(&h.page)
                     .map(|d| d.relative(app.today))
@@ -1465,15 +1466,24 @@ fn render_query(f: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 h.page.clone()
             };
+            let cursor = focused && n == app.query_row;
+            let bg = if cursor { theme::SELECT_BG } else { theme::PANEL };
             lines.push(Line::from(vec![
-                Span::styled("• ", Style::default().fg(color).bg(theme::PANEL)),
+                Span::styled(
+                    if cursor { "▌" } else { " " },
+                    Style::default().fg(theme::ACCENT).bg(bg),
+                ),
+                Span::styled("• ", Style::default().fg(color).bg(bg)),
                 Span::styled(
                     format!("{:<8}", truncate(&badge, 8)),
-                    Theme::panel().fg(theme::FAINT),
+                    Style::default().fg(theme::FAINT).bg(bg),
                 ),
                 Span::styled(
-                    truncate(&h.content.replace('\n', " "), inner.width.saturating_sub(12) as usize),
-                    Theme::panel(),
+                    truncate(
+                        &h.content.replace('\n', " "),
+                        inner.width.saturating_sub(13) as usize,
+                    ),
+                    Style::default().fg(theme::FG).bg(bg),
                 ),
             ]));
         }

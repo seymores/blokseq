@@ -751,12 +751,11 @@ impl App {
         };
         match cmd.as_str() {
             "q" => {
-                self.quit = true;
+                self.quit_now(true, false);
                 true
             }
             "q!" => {
-                self.prune_on_quit = false;
-                self.quit = true;
+                self.quit_now(false, false);
                 true
             }
             "w" => {
@@ -764,8 +763,7 @@ impl App {
                 true
             }
             "wq" | "x" => {
-                self.do_backup();
-                self.quit = true;
+                self.quit_now(true, true);
                 true
             }
             "e" | "edit" => {
@@ -1020,11 +1018,125 @@ fn find_pair(chars: &[char], from: usize, closer: char) -> Option<usize> {
     None
 }
 
+// ------------------------------------------------------- search and board
+
+impl App {
+    /// One quit path for every way out of the app, so an in-flight edit is
+    /// always committed first -- `q` while typing in a block must not lose it.
+    pub fn quit_now(&mut self, prune: bool, snapshot: bool) {
+        self.commit_edit();
+        if snapshot {
+            self.do_backup();
+        }
+        self.prune_on_quit = prune;
+        self.quit = true;
+    }
+
+    /// The search screen is a prompt, not a normal buffer: printable keys are
+    /// the query, `↑`/`↓` (or `Ctrl-n`/`Ctrl-p`) pick a result, `⏎` opens it.
+    pub fn search_key(&mut self, k: KeyEvent, ctrl: bool) {
+        match k.code {
+            KeyCode::Esc => self.go_back(),
+            KeyCode::Enter => self.search_open_selected(),
+            KeyCode::Up => self.search_selected = self.search_selected.saturating_sub(1),
+            KeyCode::Down => {
+                if self.search_selected + 1 < self.search_results.len() {
+                    self.search_selected += 1;
+                }
+            }
+            KeyCode::Backspace => {
+                self.search_query.pop();
+                self.run_search();
+            }
+            KeyCode::Char('n') if ctrl => {
+                if self.search_selected + 1 < self.search_results.len() {
+                    self.search_selected += 1;
+                }
+            }
+            KeyCode::Char('p') if ctrl => {
+                self.search_selected = self.search_selected.saturating_sub(1)
+            }
+            KeyCode::Char(c) if !ctrl => {
+                self.search_query.push(c);
+                self.run_search();
+            }
+            _ => {}
+        }
+    }
+
+    pub fn search_open_selected(&mut self) {
+        let Some(hit) = self.search_results.get(self.search_selected).cloned() else {
+            self.toast(ToastKind::Warn, "no result selected", Some("type to search"));
+            return;
+        };
+        self.push_history();
+        match crate::model::parse_journal_key(&hit.page) {
+            Some(day) => self.goto_journal(day),
+            None => self.goto_page(&hit.page),
+        }
+        self.select_block(hit.block_id);
+        self.scroll_to_selection();
+    }
+
+    /// The board's three columns, in board order.
+    pub fn board_columns(&self) -> Vec<(&'static str, Vec<crate::model::RefHit>)> {
+        ["TODO", "DOING", "DONE"]
+            .iter()
+            .map(|s| (*s, self.db.by_status(s)))
+            .collect()
+    }
+
+    pub fn board_move(&mut self, dx: i64, dy: i64) {
+        let cols = self.board_columns();
+        if cols.is_empty() {
+            return;
+        }
+        if dx != 0 {
+            let n = cols.len() as i64;
+            self.query_col = ((self.query_col as i64 + dx).rem_euclid(n)) as usize;
+        }
+        let len = cols[self.query_col].1.len();
+        if dy != 0 && len > 0 {
+            self.query_row = ((self.query_row as i64 + dy).rem_euclid(len as i64)) as usize;
+        }
+        self.query_row = if len == 0 {
+            0
+        } else {
+            self.query_row.min(len - 1)
+        };
+    }
+
+    pub fn board_open(&mut self) {
+        let cols = self.board_columns();
+        let Some((_, hits)) = cols.get(self.query_col) else {
+            return;
+        };
+        let Some(hit) = hits.get(self.query_row) else {
+            self.toast(ToastKind::Info, "this column is empty", None);
+            return;
+        };
+        let target = LinkTarget {
+            kind: "query",
+            label: crate::app::snippet(&hit.content, 34),
+            page: Some(hit.page.clone()),
+            block: Some(hit.block_id),
+            at: 0,
+        };
+        self.jump_to(&target);
+    }
+}
+
 // --------------------------------------------------------------- dispatch
 
 impl App {
     /// Normal mode at the tree level.
     pub fn tree_key(&mut self, k: KeyEvent, ctrl: bool) {
+        // The search screen is a prompt: printable keys are query text, so
+        // `j` types a `j` there instead of moving. Navigation is arrows.
+        if self.view == View::Search {
+            self.search_key(k, ctrl);
+            return;
+        }
         let Some(name) = key_name(k, ctrl) else { return };
         if !self.pending.is_empty() {
             let seq = format!("{}{}", self.pending, name);
@@ -1038,7 +1150,10 @@ impl App {
             self.unknown_key(&seq);
             return;
         }
-        if matches!(name.as_str(), "g" | "d" | "y" | "z" | ">" | "<" | "c" | "C-w") {
+        if matches!(
+            name.as_str(),
+            "g" | "d" | "y" | "z" | "Z" | ">" | "<" | "c" | "C-w"
+        ) {
             self.pending = name;
             return;
         }
@@ -1100,6 +1215,37 @@ impl App {
                 _ => {}
             }
         }
+        // The board is a set of columns, so h/l and j/k walk it rather than the
+        // block list underneath.
+        if self.view == View::Query {
+            match seq {
+                "j" => {
+                    self.board_move(0, 1);
+                    return true;
+                }
+                "k" => {
+                    self.board_move(0, -1);
+                    return true;
+                }
+                "l" | "<Tab>" => {
+                    self.board_move(1, 0);
+                    return true;
+                }
+                "h" | "<S-Tab>" => {
+                    self.board_move(-1, 0);
+                    return true;
+                }
+                "<CR>" | "C-]" => {
+                    self.board_open();
+                    return true;
+                }
+                "<Esc>" => {
+                    self.go_back();
+                    return true;
+                }
+                _ => {}
+            }
+        }
         match seq {
             "j" => self.move_selection(1),
             "k" => self.move_selection(-1),
@@ -1152,6 +1298,12 @@ impl App {
             "?" => self.set_view(View::Help),
             "[" => self.shift_journal(-1),
             "]" => self.shift_journal(1),
+            // `q` quits here rather than recording a macro: macros are not
+            // implemented, and a key that does nothing is worse than a small
+            // deviation. `ZZ` / `ZQ` are vim's own quit pair.
+            "q" => self.quit_now(true, false),
+            "ZZ" => self.quit_now(true, true),
+            "ZQ" => self.quit_now(false, false),
             "<Esc>" => self.escape_tree(),
             _ => return false,
         }
@@ -1306,6 +1458,8 @@ impl App {
                 self.select_block(id);
                 self.mode = Mode::Normal;
             }
+            // The same deviation as in NORMAL mode, and it commits first.
+            "q" => self.quit_now(true, false),
             _ => return false,
         }
         true
@@ -1363,4 +1517,156 @@ pub fn key_name(k: KeyEvent, ctrl: bool) -> Option<String> {
         KeyCode::PageUp => "C-u".to_string(),
         _ => return None,
     })
+}
+
+/// Regression tests for the key router. The `q` bug (documented in KEYMAP but
+/// never wired into the dispatcher) is exactly the class of mistake these are
+/// here to catch: a key that the help screen promises must do something.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::PageKind;
+
+    /// One database per test: tests run in parallel threads of the same process,
+    /// so the path has to be unique or one test deletes another's schema.
+    fn app(name: &str) -> App {
+        let path =
+            std::env::temp_dir().join(format!("blok-test-{}-{}.db", std::process::id(), name));
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{}", path.display(), suffix));
+        }
+        let db = crate::db::Db::open(&path).expect("open test db");
+        let today = crate::db::today();
+        let mut app = App::new(db, today);
+        let page = app.db.ensure_page("Test Page", PageKind::Page);
+        app.db.create_block(page.id, None, None, "first block");
+        app.db
+            .create_block(page.id, None, None, "second block with [[Test Page]]");
+        app.goto_page("Test Page");
+        app
+    }
+
+    fn key(app: &mut App, c: char) {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    fn ctrl(app: &mut App, c: char) {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL));
+    }
+    fn code(app: &mut App, c: KeyCode) {
+        app.handle_key(KeyEvent::new(c, KeyModifiers::NONE));
+    }
+
+    #[test]
+    fn q_quits() {
+        let mut a = app("q_quits");
+        key(&mut a, 'q');
+        assert!(a.quit, "`q` is in the keymap, so it must quit");
+    }
+
+    #[test]
+    fn colon_q_quits() {
+        let mut a = app("colon_q");
+        key(&mut a, ':');
+        assert!(a.ex.is_some(), "`:` opens the command line");
+        key(&mut a, 'q');
+        code(&mut a, KeyCode::Enter);
+        assert!(a.quit, "`:q` must quit");
+    }
+
+    #[test]
+    fn q_while_typing_commits_before_quitting() {
+        let mut a = app("q_commits");
+        code(&mut a, KeyCode::Enter); // NORMAL -> TEXT
+        assert_eq!(a.mode, Mode::Text);
+        let id = a.rows[0].id;
+        // A dirty buffer, however it got that way.
+        if let Some(ed) = a.editor.as_mut() {
+            ed.insert_str("tail");
+        }
+        key(&mut a, 'q');
+        assert!(a.quit);
+        let content = a.db.block(id).map(|b| b.content).unwrap_or_default();
+        assert!(
+            content.contains("tail"),
+            "an in-flight edit must be committed, not dropped: {content:?}"
+        );
+    }
+
+    #[test]
+    fn q_in_insert_mode_types_a_q() {
+        let mut a = app("q_insert");
+        code(&mut a, KeyCode::Enter); // NORMAL -> TEXT
+        key(&mut a, 'i'); // -> INSERT
+        key(&mut a, 'q');
+        assert!(!a.quit, "in INSERT, `q` is a character, exactly as in vim");
+        assert!(a
+            .editor
+            .as_ref()
+            .map(|e| e.text().contains('q'))
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn esc_walks_the_vim_ladder() {
+        let mut a = app("esc_ladder");
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.mode, Mode::Text);
+        key(&mut a, 'i');
+        assert_eq!(a.mode, Mode::Insert);
+        code(&mut a, KeyCode::Esc);
+        assert_eq!(a.mode, Mode::Text, "Esc from INSERT lands in TEXT");
+        code(&mut a, KeyCode::Esc);
+        assert_eq!(a.mode, Mode::Normal, "Esc from TEXT lands in NORMAL");
+    }
+
+    #[test]
+    fn dd_deletes_and_u_restores() {
+        let mut a = app("dd_undo");
+        let before = a.rows.len();
+        let id = a.rows[0].id;
+        key(&mut a, 'd');
+        assert!(a.pending == "d", "`d` is an operator waiting for a motion");
+        key(&mut a, 'd');
+        assert_eq!(a.rows.len(), before - 1, "dd deletes one block");
+        key(&mut a, 'u');
+        assert_eq!(a.rows.len(), before, "u brings it back");
+        assert!(a.db.block(id).is_some());
+    }
+
+    #[test]
+    fn ctrl_bracket_follows_a_link() {
+        let mut a = app("follow_link");
+        a.selected = 1; // the block that links to [[Test Page]]
+        a.follow_link();
+        assert_eq!(a.view, View::Page("Test Page".into()));
+    }
+
+    #[test]
+    fn panels_toggle_and_persist() {
+        let mut a = app("panels");
+        assert!(a.show_sidebar && a.show_refs);
+        ctrl(&mut a, 'n');
+        ctrl(&mut a, 'b');
+        assert!(!a.show_sidebar && !a.show_refs);
+        assert_eq!(a.db.get_setting("show_sidebar").as_deref(), Some("false"));
+        assert_eq!(a.db.get_setting("show_refs").as_deref(), Some("false"));
+    }
+
+    #[test]
+    fn console_is_read_only() {
+        let a = app("console");
+        assert!(a.db.console_query("DELETE FROM blocks").is_err());
+        assert!(a.db.console_query("SELECT count(*) FROM blocks").is_ok());
+    }
+
+    #[test]
+    fn every_documented_quit_key_ends_the_session() {
+        for path in ["q", "ZZ", "ZQ"] {
+            let mut a = app(&format!("quit_{}", path));
+            for c in path.chars() {
+                key(&mut a, c);
+            }
+            assert!(a.quit, "`{path}` must quit");
+        }
+    }
 }

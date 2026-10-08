@@ -1,8 +1,8 @@
  blok   TODO board                                                                             37 blocks · 12 pages · 11 refs  local  09:41
 ╭ TODO  3 ─────────────────────────────────────╮╭ DOING  2 ──────────────────────────────────╮╭ DONE  1 ───────────────────────────────────╮
-│• Project…TODO Single-file export + import …  ││• Project…DOING Snapshot uploader (rclone…  ││• Project…DONE Conflict model: last-write…  │
-│• blok TUITODO Decide whether the TUI shoul…  ││• Today   DOING Write up the sync story f…  ││                                            │
-│• Today   TODO Ask Dana whether the trial k…  ││                                            ││query: {:status "done"}                     │
+│▌• Project…TODO Single-file export + import…  ││ • Project…DOING Snapshot uploader (rclon…  ││ • Project…DONE Conflict model: last-writ…  │
+│ • blok TUITODO Decide whether the TUI shou…  ││ • Today   DOING Write up the sync story …  ││                                            │
+│ • Today   TODO Ask Dana whether the trial …  ││                                            ││query: {:status "done"}                     │
 │                                              ││query: {:status "doing"}                    ││                                            │
 │query: {:status "todo"}                       ││                                            ││                                            │
 │                                              ││                                            ││                                            │

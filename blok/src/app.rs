@@ -191,6 +191,9 @@ pub struct App {
     pub search_query: String,
     pub search_results: Vec<RefHit>,
     pub search_selected: usize,
+    /// Board cursor: which status column, and which row in it.
+    pub query_col: usize,
+    pub query_row: usize,
     /// Blocks that mention the page title without linking it.
     pub unlinked: Vec<RefHit>,
     pub prev_view: Option<View>,
@@ -252,6 +255,8 @@ impl App {
             search_query: String::new(),
             search_results: Vec::new(),
             search_selected: 0,
+            query_col: 0,
+            query_row: 0,
             unlinked: Vec::new(),
             prev_view: None,
             toast: None,
@@ -1524,6 +1529,10 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     (":w", "snapshot + queue for the remote", "Ex"),
     ("Ctrl-S", "snapshot, then the storage screen", "Any"),
     ("q / :q", "quit, pruning unwritten journals first", "Normal"),
+    ("ZZ / ZQ", "snapshot-and-quit / quit without the prune pass", "Normal"),
+    ("Views", "", ""),
+    ("/ then type", "the search screen is a prompt: ↑↓ pick, ⏎ opens the block", "Any"),
+    ("h l j k ⏎", "on the board: columns, rows, jump to the block", "Any"),
 ];
 
 /// Every `:` command: completion in the command line, and `:help`.

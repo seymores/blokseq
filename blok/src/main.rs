@@ -154,6 +154,9 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             if k.modifiers.contains(KeyModifiers::CONTROL) && matches!(k.code, KeyCode::Char('c')) {
+                // Committing first means Ctrl-C during an edit is a save, not a
+                // data loss. The prune pass at the end still runs.
+                app.commit_edit();
                 break;
             }
             // Ctrl-S is the one global that is not a vim binding: a snapshot is
