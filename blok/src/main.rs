@@ -144,6 +144,24 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     app.db.refresh_stats();
 
     let mut terminal = ratatui::init();
+
+    // Ask the terminal to disambiguate the keys that share a control byte under
+    // the legacy encoding: Ctrl-M/Enter, Ctrl-I/Tab, Ctrl-H/Backspace,
+    // Ctrl-[/Esc, Ctrl-J/Enter. Terminals that speak the kitty keyboard protocol
+    // (kitty, WezTerm, foot, Ghostty, recent tmux with extended-keys) will; the
+    // rest ignore the request, and then `gm` is the reliable way to the panel.
+    // Detecting it lets the hint bar name the key that actually works here.
+    let enhanced = crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
+    if enhanced {
+        let _ = crossterm::execute!(
+            std::io::stdout(),
+            crossterm::event::PushKeyboardEnhancementFlags(
+                crossterm::event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+            )
+        );
+    }
+    app.ctrl_m_works = enhanced;
+
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
         loop {
             terminal.draw(|f| ui::render(f, &mut app))?;
@@ -174,6 +192,9 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         }
         Ok(())
     })();
+    if enhanced {
+        let _ = crossterm::execute!(std::io::stdout(), crossterm::event::PopKeyboardEnhancementFlags);
+    }
     ratatui::restore();
     // Quitting is a save point: prune the days that were never written to.
     app.prune_journals();

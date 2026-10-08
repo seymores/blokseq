@@ -40,11 +40,11 @@ pub fn render(f: &mut Frame, app: &mut App) {
             None
         }
         View::Backup => {
-            render_backup(f, app, chunks[1]);
+            render_backup(f, app, chunks[0]);
             None
         }
         View::Help => {
-            render_help(f, app, chunks[1]);
+            render_help(f, app, chunks[0]);
             None
         }
         View::Sql => {
@@ -1514,8 +1514,18 @@ fn render_backup(f: &mut Frame, app: &mut App, area: Rect) {
 fn render_help(f: &mut Frame, app: &App, area: Rect) {
     let _ = app;
     let cols = Layout::horizontal([Constraint::Percentage(52), Constraint::Percentage(48)]).split(area);
+    // Split at a section boundary near the middle, so the columns are balanced
+    // and no group is orphaned the way a naive half-split leaves them.
     let half = KEYMAP.len() / 2;
-    for (i, slice) in [&KEYMAP[..half], &KEYMAP[half..]].iter().enumerate() {
+    let split = KEYMAP
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, d, _))| d.is_empty())
+        .map(|(i, _)| i)
+        .min_by_key(|i| (*i as i64 - half as i64).abs())
+        .unwrap_or(half)
+        .max(1);
+    for (i, slice) in [&KEYMAP[..split], &KEYMAP[split..]].iter().enumerate() {
         f.render_widget(
             panel(
                 if i == 0 { "KEYMAP · NAVIGATION & EDITING" } else { "KEYMAP · LINKS & PERSISTENCE" },
@@ -1722,7 +1732,9 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                         ("?".into(), "all keys".into()),
                     ]);
                     if !app.show_meta {
-                        v.insert(0, ("Ctrl-M".into(), "page metadata".into()));
+                        v.insert(0, (app.meta_key().into(), "page metadata".into()));
+                    } else if app.focus == Focus::Main {
+                        v.push((app.meta_key().into(), "hide metadata".into()));
                     }
                     v
                 }
@@ -2016,4 +2028,92 @@ pub fn journal_badge(app: &App, day: &JournalDay) -> String {
 pub fn caret_position_for(app: &App) -> Option<Position> {
     let _ = app;
     None
+}
+
+/// Render-level regression tests. The bug that prompted these: when the top bar
+/// was deleted the layout shifted, and two views kept drawing into the row that
+/// had become the one-line message area -- so Help and Storage rendered into a
+/// height-0 rectangle and the frames were silently blank. A frame that draws
+/// nothing is not a subtle failure, it just needs something to notice it.
+#[cfg(test)]
+mod render_tests {
+    use crate::app::{App, View};
+    use crate::db::Db;
+    use crate::model::PageKind;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    fn app(name: &str) -> App {
+        let path =
+            std::env::temp_dir().join(format!("blok-render-{}-{}.db", std::process::id(), name));
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{}", path.display(), suffix));
+        }
+        let db = Db::open(&path).expect("open test db");
+        let today = crate::db::today();
+        let mut app = App::new(db, today);
+        let page = app.db.ensure_page("Test Page", PageKind::Page);
+        app.db.create_block(page.id, None, None, "first block");
+        app.db
+            .create_block(page.id, None, None, "second block with [[Test Page]]");
+        app.goto_page("Test Page");
+        app
+    }
+
+    /// Count cells that carry a visible glyph.
+    fn painted(app: &mut App, w: u16, h: u16) -> usize {
+        let mut term = Terminal::new(TestBackend::new(w, h)).expect("terminal");
+        term.draw(|f| crate::ui::render(f, app)).expect("draw");
+        let buf = term.backend().buffer();
+        let mut n = 0usize;
+        for y in 0..h {
+            for x in 0..w {
+                if !buf[(x, y)].symbol().trim().is_empty() {
+                    n += 1;
+                }
+            }
+        }
+        n
+    }
+
+    #[test]
+    fn every_view_draws_something() {
+        let views: Vec<(&str, View)> = vec![
+            ("journal", View::Journal(crate::model::JournalDay::new(crate::db::today()))),
+            ("page", View::Page("Test Page".into())),
+            ("find", View::Page("Test Page".into())),
+            ("search", View::Search),
+            ("board", View::Query),
+            ("storage", View::Backup),
+            ("help", View::Help),
+            ("sql", View::Sql),
+        ];
+        for (name, view) in views {
+            let mut a = app(name);
+            a.set_view(view.clone());
+            if name == "find" {
+                a.open_palette();
+            }
+            if name == "sql" {
+                a.open_sql();
+            }
+            let n = painted(&mut a, 100, 30);
+            assert!(
+                n > 200,
+                "{view:?} drew only {n} cells -- it is rendering off-screen or into a zero-height row"
+            );
+        }
+    }
+
+    #[test]
+    fn the_metadata_panel_renders_when_shown_and_not_when_hidden() {
+        let mut a = app("meta_render");
+        let hidden = painted(&mut a, 100, 30);
+        a.show_meta = true;
+        let shown = painted(&mut a, 100, 30);
+        assert!(
+            shown > hidden,
+            "showing the panel must paint more, not the same ({hidden} -> {shown})"
+        );
+    }
 }

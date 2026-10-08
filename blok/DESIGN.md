@@ -382,7 +382,20 @@ missing, a snapshot did not upload, or the schema is not what you think.
 
 ![SQL console: .tables](dumps/png/25-sql-tables.png)
 
-**Page metadata** (`Ctrl-M`) is off by default and the status bar advertises it
+**A terminal caveat, handled rather than hidden.** `Ctrl-M` is the same byte as
+`Enter` (`0x0D`) under the legacy terminal encoding, which is why the first
+attempt at this binding simply started editing the block. blok now asks the
+terminal to disambiguate those keys at startup (the kitty keyboard protocol's
+`DISAMBIGUATE_ESCAPE_CODES`, via crossterm); where the terminal agrees — kitty,
+WezTerm, foot, Ghostty, tmux 3.3+ with `extended-keys on` — `Ctrl-M` arrives as
+itself and the hint bar says `Ctrl-M`. Where it does not, `Ctrl-M` is
+indistinguishable from Enter and the hint bar says `gm` instead, because
+advertising a key that edits the block is worse than advertising a two-key
+sequence. The same negotiation fixes the other four collisions in this family:
+`Ctrl-I`/Tab, `Ctrl-H`/Backspace, `Ctrl-[`/Esc and `Ctrl-J`/Enter. `gm` and
+`:set meta` work everywhere.
+
+**Page metadata** (`Ctrl-M`) is off by default and the hint bar advertises it
 (`Ctrl-M page metadata`), so a hidden panel is an invitation rather than a
 mystery. It persists in `settings`, and `:set nometa` turns it off.
 
@@ -693,6 +706,11 @@ Being explicit about this matters more than the demo looking good.
   outdent, reorder, soft delete, fold, undo of the last three of those.
 * `VACUUM INTO` snapshots while the database is open, `backup_log` history, the
   integrity check, and `wal_checkpoint` before measuring.
+* Rendering is covered too: `every_view_draws_something` renders each view
+  into a `TestBackend` and fails if one paints almost nothing. It exists because
+  deleting the top bar shifted the layout and left Help and Storage drawing into
+  the row that had become the one-line message area -- two frames were silently
+  blank for two revisions, and only a screenshot review caught it.
 * The key router is covered by 18 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves

@@ -1194,7 +1194,10 @@ impl App {
             "G" => self.jump(true),
             "C-d" => self.move_selection(12),
             "C-u" => self.move_selection(-12),
-            "C-m" => self.toggle_meta(),
+            // Ctrl-M only arrives as itself on terminals that disambiguate
+            // it from Enter (see main.rs). `gm` is the spelling that always
+            // works, which is why the hint bar may name it instead.
+            "C-m" | "gm" => self.toggle_meta(),
             // Ctrl-P is the navigation: "Find" is everything the sidebar and
             // the page tree used to be, minus the pane you had to find first.
             "C-p" => self.open_palette(),
@@ -1626,6 +1629,28 @@ mod tests {
         a.selected = 1; // the block that links to [[Test Page]]
         a.follow_link();
         assert_eq!(a.view, View::Page("Test Page".into()));
+    }
+
+    #[test]
+    fn gm_always_toggles_metadata() {
+        // Ctrl-M and Enter share a byte, so the always-available spelling needs
+        // its own guarantee.
+        let mut a = app("gm_meta");
+        assert!(!a.show_meta);
+        key(&mut a, 'g');
+        key(&mut a, 'm');
+        assert!(a.show_meta, "gm shows the page metadata");
+        assert_eq!(a.meta_key(), "gm", "without terminal support, gm is named");
+    }
+
+    #[test]
+    fn enter_edits_and_does_not_toggle_metadata() {
+        // The reported bug: Ctrl-M arriving as Enter started editing. Enter must
+        // keep meaning "edit this block".
+        let mut a = app("enter_not_meta");
+        code(&mut a, KeyCode::Enter);
+        assert!(a.text_focus, "Enter puts the caret in the block");
+        assert!(!a.show_meta, "and leaves the metadata panel alone");
     }
 
     #[test]

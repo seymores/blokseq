@@ -190,11 +190,15 @@ pub struct App {
     pub redo: Vec<UndoOp>,
 
     /// The page-metadata panel: metadata, linked and unlinked references. Off by
-    /// default -- it is something you ask for with `Ctrl-M`, not furniture you
-    /// live with.
+    /// default -- it is something you ask for with `Ctrl-M` (or `gm`), not
+    /// furniture you live with.
     pub show_meta: bool,
     /// Cached for the page currently open, refreshed by `load_view`.
     pub meta: Option<crate::db::PageMeta>,
+    /// Whether this terminal can tell `Ctrl-M` from `Enter`. Under the legacy
+    /// encoding they are the same byte, so the hint bar names `gm` when it
+    /// cannot, instead of advertising a key that edits the block instead.
+    pub ctrl_m_works: bool,
 
     pub right_selected: usize,
     pub linked: Vec<(String, Vec<RefHit>)>,
@@ -260,6 +264,7 @@ impl App {
             redo: Vec::new(),
             show_meta,
             meta: None,
+            ctrl_m_works: false,
             right_selected: 0,
             linked: Vec::new(),
             linked_selected: 0,
@@ -323,6 +328,18 @@ impl App {
     /// The page currently open, for tests and for the metadata panel.
     pub fn view_meta_id(&self) -> Option<i64> {
         self.page_id
+    }
+
+    /// The key that actually works for the metadata panel in *this* terminal:
+    /// `Ctrl-M` where the terminal can distinguish it from Enter, `gm` where it
+    /// cannot. Advertising a key that edits the block instead is worse than
+    /// advertising a two-key sequence.
+    pub fn meta_key(&self) -> &'static str {
+        if self.ctrl_m_works {
+            "Ctrl-M"
+        } else {
+            "gm"
+        }
     }
 
     pub fn load_right(&mut self) {
@@ -1404,7 +1421,7 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
 /// Static keymap: single source of truth for `?` and the hint bar.
 pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("Modes", "", ""),
-    ("Esc", "insert → text → blocks (vim's ladder)", "Any"),
+    ("Esc", "one press always stops editing; a second drops the caret", "Any"),
     ("Enter", "put the cursor in this block's text", "Normal"),
     ("i a I A", "insert · append · line start · line end", "Normal"),
     ("o O cc", "open a block below · above · change this one", "Normal"),
@@ -1445,7 +1462,7 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("Ctrl-w l", "focus the references pane", "Normal"),
     ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
     ("Panels and troubleshooting", "", ""),
-    ("Ctrl-M", "show / hide page metadata (facts, refs, mentions)", "Any"),
+    ("Ctrl-M · gm", "show / hide page metadata (facts, refs, mentions)", "Any"),
     (":set meta | nometa", "the same, spelled out, and persisted", "Ex"),
     (":sql", "read-only SQL console, on demand", "Ex"),
     (":w", "snapshot + queue for the remote", "Ex"),

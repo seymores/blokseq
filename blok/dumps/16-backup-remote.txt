@@ -1,42 +1,42 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+╭ STORAGE ─────────────────────────────────────────────────────╮╭ SNAPSHOTS → REMOTE ──────────────────────────────────────────────────────╮
+│  database           /Users/ping/Documents/deepseek-harness/de││  remote  dropbox:Apps/blok   rclone copy --checksum                      │
+│  engine             SQLite · WAL · FTS5                      ││  one file in, one file out — no document merge, no conflict soup         │
+│  file size          108.0 KB                                 ││                                                                          │
+│  wal size           0 B                                      ││  WHEN            SIZE      STATE     FILE                                │
+│  integrity          ok                                       ││  19:40:21      100.0 KB uploaded blok-20261008-194021.sqlite             │
+│                                                              ││  01:40:21      1.1 MB   uploaded blok-20261008-014021.sqlite             │
+│  tables                                                      ││  04:40:21      1.1 MB   uploaded blok-20261008-044021.sqlite             │
+│  pages              12 rows                                  ││  07:40:21      1.1 MB   uploaded blok-20261008-074021.sqlite             │
+│  journals           4 rows                                   ││  10:40:21      1.1 MB   uploaded blok-20261008-104021.sqlite             │
+│  blocks             38 rows                                  ││  13:40:21      1.1 MB   uploaded blok-20261008-134021.sqlite             │
+│  refs               11 rows                                  ││  16:40:21      1.1 MB   queued   blok-20261008-164021.sqlite             │
+│  properties         5 rows                                   ││                                                                          │
+│                                                              ││  WHY THIS IS SAFE                                                        │
+│  maintenance                                                 ││  ▸ VACUUM INTO writes a consistent snapshot while the app keeps running. │
+│  empty blocks       0 (transient)                            ││  ▸ The snapshot is a plain SQLite file: restore = copy it back and open. │
+│  pruned journals    none pending                             ││  ▸ WAL means a crash mid-write replays instead of corrupting.            │
+│                                                              ││  ▸ Syncing a live .db by file copy is not safe; syncing a snapshot is.   │
+│  layout                                                      ││  ▸ History is the snapshot list: point-in-time restore without git.      │
+│  ~/.blok/                                                    ││                                                                          │
+│  ├── blok.db            blocks · pages · refs · FTS5         ││  upload descriptor  blok-20261008-194021.upload.json                     │
+│  ├── blok.db-wal        crash safety, checkpointed on quit   ││                                                                          │
+│  ├── snapshots/         VACUUM INTO single-file copies       ││                                                                          │
+│  └── snapshots/queue/   upload descriptors for the remote    ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+╰──────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────╯
  ✓  snapshot → dropbox:Apps/blok   VACUUM INTO, then rclone copy --checksum
  NORMAL  ok · 108.0 KB
  Ctrl-S snapshot   :sql console   Esc back
