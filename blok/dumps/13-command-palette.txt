@@ -1,0 +1,42 @@
+ blok   Journal  ·  Thursday, October 8, 2026  TODAY                                           37 blocks · 12 pages · 11 refs  local  09:41
+╭ GRAPH  12 ───────────────╮╭ JOURNAL  Thursday, October 8, 2026 ────────────────────────────────────────╮╭ LINKED REFERENCES  2 ──────────╮
+│TODAY                     ││Thursday, October 8, 2026   today   12 blocks                               ││Project Aurora (1)              │
+│● Thursday, October 8, …  ││────────────────────────────────────────────────────────────────────────────││· Storage argument lives in (…  │
+│                          ││▌▾ Deep work 09:00–12:30 on the block store                                 ││                                │
+│JOURNALS                  ││ │ • Replaced the integer  position  with a fractional index                ││Yesterday (1)                   │
+│  Yesterday     Wed 07 · 2││ │ • Reordering 4k siblings was O(n) writes → now it is one row             ││· Touches ((blk-00000016)) — …  │
+│  2d ago        Tue 06 · 1││ ▾ Standup — [[Project Aurora]]                                             ││                                │
+│  3d ago        Mon 05 · 2││ │ • Export format settled: the SQLite file *is* the format                 ││────────────────────────────────│
+│                          ││ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                    ││UNLINKED (mentions of this title│
+│PAGES                     ││ │ │ • deadline:: 2026-02-20                                                ││· none                          │
+│  Project Aurora  2↗ · 11b││     ╭ Command palette  Ctrl-P ─────────────────────────────────────────────╮│                                │
+│  blok TUI         2↗ · 5b││ │ • │› back▏                                                               ││                                │
+│  sync             2↗ · 0b││ ▾ Id│──────────────────────────────────────────────────────────────────────││                                │
+│  SQLite           1↗ · 1b││ │ • │▸ Backup now (VACUUM INTO + remote) writes one sqlite file            ││                                │
+│  Terminal UX      1↗ · 1b││ • Re│  Restore from snapshot…            opens the backup screen           ││                                │
+│  blok             1↗ · 0b││ • St│                                                                      ││                                │
+│  Reading list          1b││     ╰──────────────────────────────────────────────────────────────────────╯│                                │
+│  Weekly review         1b││  • type here for the next block — or press o                               ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│──────────────────────────││                                                                            ││                                │
+│graph  4 journals · 12 pag││                                                                            ││                                │
+╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
+ NORMAL  blocks  ·  2026-10-08  12 blocks  ·  block #21                                                               no snapshot yet — :w
+ j/k blocks   h/l parent/child   ⏎ into text   i insert   o/O new block   dd/yy/p cut, copy, paste   >>/<< indent   za fold   Ctrl-] follow

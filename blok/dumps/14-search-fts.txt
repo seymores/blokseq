@@ -1,0 +1,42 @@
+ blok   / Search                                                                               37 blocks · 12 pages · 11 refs  local  09:41
+╭ SEARCH  2 hits · bm25 ────────────────────────────────────────────────────────╮╭ BLOCK PREVIEW ──────────────────────────────────────────╮
+│▸ snapshot▏   FTS5 · porter unicode61                                          ││source  Pages / Project Aurora                           │
+│───────────────────────────────────────────────────────────────────────────────││block   blk-00000007                                     │
+│▌ Project AuroraDOING Snapshot uploader (rclone backend)                       ││                                                         │
+│  Project AuroraOpen question #sync: what happens when two devices both sna    ││  DOING Snapshot uploader (rclone backend)               │
+│                                                                               ││                                                         │
+│                                                                               ││  ⏎ open page   g zoom block                             │
+│                                                                               ││                                                         │
+│                                                                               ││  matched refs                                           │
+│                                                                               ││  · Project Aurora (1)                                   │
+│                                                                               ││  · 2026-10-07 (1)                                       │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+│                                                                               ││                                                         │
+╰───────────────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────╯
+ NORMAL  blocks  ·  "snapshot"  2 hits  ·  block #21                                                                  no snapshot yet — :w
+ / type   ↑↓ results   ⏎ open   Esc back

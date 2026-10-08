@@ -1,0 +1,42 @@
+ blok   SQL console  ·  read-only  Esc  leaves                                                 37 blocks · 12 pages · 11 refs  local  09:41
+╭ SQL CONSOLE  read-only · SELECT, PRAGMA, EXPLAIN, WITH ──────────────────────────────────────────────────────────────────────────────────╮
+│sqlite> ▏                                                                                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭ RESULT ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  The engine stays off the screen until something is wrong.                                                                               │
+│                                                                                                                                          │
+│  .tables                                       tables and views, with row counts                                                         │
+│  .schema blocks                                the DDL for a table                                                                       │
+│  SELECT * FROM blocks LIMIT 20                 what actually got stored                                                                  │
+│  PRAGMA integrity_check                        is the file sound                                                                         │
+│  PRAGMA journal_mode                           wal, and the pragmas in force                                                             │
+│  SELECT * FROM backup_log ORDER BY id DESC     snapshot history                                                                          │
+│  SELECT * FROM refs WHERE from_block = 42      why a backlink is missing                                                                 │
+│  EXPLAIN QUERY PLAN SELECT ...                 did the index get used                                                                    │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  blocks  ·  read-only. `.tables` · `.schema blocks` · any SELECT or PRAGMA  ·  block #21                      no snapshot yet — :w
+ ⏎ run   .tables list tables   ↑↓ history   Ctrl-l clear   Esc leave

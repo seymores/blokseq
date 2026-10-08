@@ -1,0 +1,24 @@
+ blok   Journal  ·  Thu 08  TODAY                                  local  09:41
+╭ JOURNAL  Thursday, October 8, 2026 ──────────────────────────────────────────╮
+│Thursday, October 8, 2026   today   12 blocks                                 │
+│──────────────────────────────────────────────────────────────────────────────│
+│ ▾ Deep work 09:00–12:30 on the block store                                   │
+│ │ • Replaced the integer  position  with a fractional index                  │
+│▌│ • Reordering 4k siblings was O(n) writes → now it is one row               │
+│ ▾ Standup — [[Project Aurora]]                                               │
+│ │ • Export format settled: the SQLite file *is* the format                   │
+│ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                      │
+│ │ │ • deadline:: 2026-02-20                                                  │
+│       priority:: A                                                           │
+│ │ • DOING Write up the sync story for [[blok TUI]]                           │
+│ ▾ Idea: journals are rows, not files #blok                                   │
+│ │ • An empty day should not exist anywhere — not on disk, not in the DB      │
+│ • Reading:  VACUUM INTO  semantics                                           │
+│ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync                           │
+│                                                                              │
+│  • type here for the next block — or press o                                 │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ NORMAL  blocks  ·  2026-10-08  12 block                  no snapshot yet — :w
+ j/k blocks   h/l parent/child   ⏎ into text   i insert   o/O new block   dd/yy/

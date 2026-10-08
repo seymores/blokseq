@@ -1,0 +1,42 @@
+ blok   # Page  ·  Project Aurora                                                              37 blocks · 12 pages · 11 refs  local  09:41
+╭ GRAPH  12 ───────────────╮╭ PAGE  Pages / Project Aurora ──────────────────────────────────────────────╮╭ LINKED REFERENCES  2 ──────────╮
+│TODAY                     ││Pages / Project Aurora    zoom   11 blocks · 2 refs                         ││blok TUI (1)                    │
+│● Thursday, October 8, …  ││────────────────────────────────────────────────────────────────────────────││· TODO Decide whether the TUI…  │
+│                          ││ ▾ Project Aurora — offline-first note sync for field teams                 ││                                │
+│JOURNALS                  ││ │ • Constraint: laptops on 2G links for weeks at a time                    ││Today (1)                       │
+│  Yesterday     Wed 07 · 2││▌│ • Decision: ship the SQLite file as the export format, not markdown      ││· Standup — [[Project Aurora]]  │
+│  2d ago        Tue 06 · 1││ │ • Rejected: markdown tree — 4k files, slow rename, no transactions       ││                                │
+│  3d ago        Mon 05 · 2││ ▾ Milestones                                                               ││────────────────────────────────│
+│                          ││ │ • TODO Single-file export + import round-trip                            ││UNLINKED (mentions of this title│
+│PAGES                     ││ │ ▾ DOING Snapshot uploader (rclone backend)                               ││· Project Aurora — offline-firs │
+│  Project Aurora  2↗ · 11b││ │ │ • DONE Conflict model: last-writer-wins per *block*, not per file      ││                                │
+│  blok TUI         2↗ · 5b││ │ • LATER On-device full-text reindex after a restore                      ││                                │
+│  sync             2↗ · 0b││ • Storage argument lives in ((↗ Idea: journals are rows, no…)) (today's jo…││                                │
+│  SQLite           1↗ · 1b││ • Open question #sync: what happens when two devices both snapshot at 09:0…││                                │
+│  Terminal UX      1↗ · 1b││                                                                            ││                                │
+│  blok             1↗ · 0b││                                                                            ││                                │
+│  Reading list          1b││                                                                            ││                                │
+│  Weekly review         1b││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│                          ││                                                                            ││                                │
+│──────────────────────────││                                                                            ││                                │
+│graph  4 journals · 12 pag││                                                                            ││                                │
+╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
+ NORMAL  blocks  ·  Pages/Project Aurora  11 blocks  ·  block #3                                                      no snapshot yet — :w
+ j/k blocks   h/l parent/child   ⏎ into text   i insert   o/O new block   dd/yy/p cut, copy, paste   >>/<< indent   za fold   Ctrl-] follow
