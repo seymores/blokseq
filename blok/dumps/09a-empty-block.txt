@@ -38,5 +38,5 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  Enter opened an empty block below, still in insert mode   state lives in the session, not in the database
- INSERT   11/13
+ INSERT   11/13                                                                                                               line 1, col 1
  Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag

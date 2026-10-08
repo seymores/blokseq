@@ -38,5 +38,5 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  TEXT mode: vim Normal, with the cursor inside the block   w b e 0 ^ $ x dw cw · Esc returns to the block list
- NORMAL   in block    1/12
+ NORMAL   in block    1/12                                                                                                   line 1, col 30
  j/k back to the blocks   w b e 0 $ move   x dw cw delete, change   ⏎ i a type   o new block   Ctrl-] follow link   Esc drop the caret

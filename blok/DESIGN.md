@@ -428,23 +428,50 @@ section. The editor is one block at a time, embedded in the outline — **not** 
 big text buffer for the page (that fights folding, per-block uuids and cursor-in-
 block semantics).
 
-### 7.1 The caret
+### 7.1 The caret and the position readout
 
 ![Block editing](dumps/png/03-block-editing.png)
 
 The block under the caret is rendered with a hot background (`▌` marker, raised
-line background) and the caret is drawn *inside the text* as `▏` — in the real
-TUI this is the hardware cursor positioned via `Frame::set_cursor_position()`;
-the mockup dumps set `fake_caret` so the cursor survives a screenshot. Note the
-caret sitting between `09` and `:00`: the cursor is a character index, and the
-line is soft-wrapped underneath it.
+line background) and the caret is drawn *inside the text* as `▏`, between `09`
+and `:00` above: the cursor is a character index, and the line is soft-wrapped
+underneath it.
+
+**This paragraph used to be false.** It claimed the caret *was* the hardware
+cursor, placed with `Frame::set_cursor_position()`, and that `fake_caret` existed
+only so a screenshot kept it. Nothing ever called `set_cursor_position`, and the
+glyph was drawn only when `fake_caret` was set — which only the mockup dumper
+did. So in a real terminal there was no caret at all: it was visible in the
+frames and nowhere else, which is the worst place for a cursor to be visible.
+Both halves are now true and both are tested: the terminal cursor is placed at
+the caret cell, and the glyph is drawn there too, so a dump is faithful and a
+terminal that would rather not blink still shows where typing goes.
+
+**Position, in words.** The right end of the status bar carries vim's ruler for
+the block being edited — `line 2, col 5` — because "where is my cursor" is a
+question a TUI should answer without decorating it. It is blank when the caret is
+in the tree: the row highlight and the `7/12` count are the tree's position
+indicator, and the hardware cursor stays out of a list it would only blink on.
+The ruler counts the block's own lines, not the visual ones: soft wrapping is a
+display detail and does not move it, exactly as in vim.
 
 Mechanics:
 
 * **Soft wrap.** `wrap_ranges()` produces `(start, end)` char ranges, breaking at
   spaces where possible; the block's text is never rewritten. `↑`/`↓` in the real
   app move by *visual* line, and the caret's screen position is recomputed from
-  the range that contains `cursor`.
+  the range that contains `cursor` — including the two cases that are not
+  "inside a range": a cursor *on* the newline that ends a line, and a cursor past
+  the last character. Both used to fall through the placement branches and leave
+  the caret at the start of the block, pointing at a line it was not on.
+* **Every rendered line fits the pane, and the caret's cell is reserved.** The
+  `Paragraph` that draws these lines wraps on *word* boundaries, so one cell of
+  overflow does not clip — it moves a whole word to the next display row, and
+  every row below it shifts while the caret keeps its old idea of the row. So
+  `wrap_ranges` gets one cell less than the pane (the caret's own cell), and the
+  `↗N` link marker and `▸ N collapsed` badge are subtracted from the text width
+  instead of being appended past it. `no_line_is_wider_than_the_pane` renders
+  every cursor position of two long blocks at four widths and checks each line.
 * **Styles carry through editing.** The same `styled_chars()` pass feeds both the
   read-only outline and the editor, so `[[links]]`, `((refs))` and `#tags` stay
   coloured while you type them; there is one parser, not two.
@@ -453,6 +480,11 @@ Mechanics:
   below) — which is also how `key:: value` property blocks are laid out.
 
 ![Multi-line block + properties](dumps/png/07-multiline-and-properties.png)
+
+That frame is also where the ruler earns its place: the caret is on the *second*
+line of the block, so the status bar reads `line 2, col 5` while the block index
+on the left still says `7/12`. Two different questions — where in the page, where
+in the block — two different numbers, and neither is an approximation.
 
 ### 7.2 Structure edits
 
@@ -540,7 +572,9 @@ NORMAL  ── i a I A o O cc ──▶  INSERT
 
 The status bar shows a small `in block` chip while the caret is in text, and the
 hint bar changes to say so — `j/k back to the blocks` is the first thing it
-offers.
+offers. Its right end then carries the caret's `line, col` inside that block
+(§7.1), which is the one piece of state a vim user expects to be able to read off
+the bottom of the screen.
 
 **Following links.** `Ctrl-]` (and `gf`) behave like vim's tag jump, with
 `Ctrl-o`/`Ctrl-i` walking the jumplist. A block that contains links is marked
@@ -641,7 +675,19 @@ shadows undo, and this is how blok avoids inheriting it).
   background, so the app looks the same on a light terminal as on a dark one.
 * **Width honesty.** The wrap and truncation maths use ratatui's
   `Line::width()` (unicode-width) rather than `char::count()`; the known gap is
-  CJK width inside the *editor's* wrap ranges, which is a roadmap item.
+  CJK width inside the *editor's* wrap ranges, which is a roadmap item. A second
+  known gap: at the pane's floor (8 columns) with a deep indent, the indent
+  prefix alone can exceed the width and a line still cannot fit — there is no
+  horizontal scroll, so the honest answer there is "do not go that narrow that
+  deep", not a claim that it works.
+* **The cursor is placed, not implied.** `render()` sets the terminal cursor for
+  whichever input is on top — the block editor, the Find prompt, the `/` prompt,
+  the `:` line, the SQL console — using the same arithmetic that draws the `▏`
+  glyph, so the two can be tested against each other
+  (`every_input_puts_the_cursor_on_its_caret`). A position that has scrolled out
+  of its pane is dropped rather than clamped to the edge, which would point at
+  the wrong cell. In an empty Find box the caret now sits *before* the
+  placeholder text instead of at the end of it.
 
 ---
 
@@ -711,7 +757,16 @@ Being explicit about this matters more than the demo looking good.
   deleting the top bar shifted the layout and left Help and Storage drawing into
   the row that had become the one-line message area -- two frames were silently
   blank for two revisions, and only a screenshot review caught it.
-* The key router is covered by 18 regression tests (`cargo test`), one per bug
+* The caret is covered the same way: `the_caret_is_the_terminal_cursor_and_the_ruler_names_it`
+  asserts the cursor's exact cell, that the glyph is under it, and that the ruler
+  agrees; `the_caret_keeps_its_line_when_it_sits_on_a_newline` closes the
+  fall-through above; `no_line_is_wider_than_the_pane` is the wrap invariant;
+  `every_input_puts_the_cursor_on_its_caret` covers the other four input surfaces;
+  and `the_tree_has_no_hardware_cursor` pins the deliberate omission, as does
+  `the_cursor_follows_the_focus` for the editor left open behind the panel;
+  `the_caret_shows_in_a_provisional_journal` covers the ghost first block, which
+  is a separate render path.
+* The key router is covered by 31 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -719,7 +774,9 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 29 frames in this document are the app's own renderer.
+* All 29 frames in this document are the app's own renderer (29 frames, 31
+  tests -- the numbers are close enough to check twice, which is why they are
+  spelled out rather than a round "about thirty").
 
 **Mocked or stubbed (and flagged as such):**
 

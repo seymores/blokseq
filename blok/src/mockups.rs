@@ -54,7 +54,8 @@ fn build_app(name: &str) -> App {
     let db = Db::open(&path).expect("open db");
     let today = crate::db::today();
     let mut app = App::new(db, today);
-    app.fake_caret = true;
+    // The caret is drawn as a glyph as well as placed as the terminal cursor, so
+    // a frame dumped to text or PNG still shows where the cursor is.
     app.clock = "09:41".into();
     // The frames show the key a modern terminal gives you (`Ctrl-M`); the
     // fallback label is exercised by the tests, not by a screenshot.

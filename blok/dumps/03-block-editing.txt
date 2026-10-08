@@ -38,5 +38,5 @@
 │                                                                                                                                          │
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- INSERT    1/12
+ INSERT    1/12                                                                                                              line 1, col 13
  Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag

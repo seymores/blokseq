@@ -212,7 +212,12 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
                     .wrap(Wrap { trim: false }),
                 inner,
             );
-            return Some((inner.x + cur.0, base + cur.1));
+            // Nothing is written yet, but the caret is already in the block you
+            // are about to type into, and it has to be visible for that to be
+            // obvious.
+            let at = (inner.x + cur.0, base + cur.1);
+            place_caret(f, inner, at);
+            return Some(at);
         }
         let mut lines = header;
         let ghost = match &app.view {
@@ -275,6 +280,10 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
 
     let mut lines: Vec<Line> = header;
     let mut caret: Option<(u16, u16)> = None;
+    // The caret that belongs to a block being edited -- the one the terminal
+    // cursor follows. `caret` below also covers "where the selected row is",
+    // which is a popup anchor rather than a cursor.
+    let mut edit_caret: Option<(u16, u16)> = None;
     // Where the cursor row sits, so a popup with no editor (the `Ctrl-]` link
     // chooser) still has something to hang off.
     let mut sel_y: Option<u16> = None;
@@ -306,6 +315,13 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
                 inner.x + cur.0,
                 base_y + cur.1,
             ));
+            // Only while this pane has the focus: `Ctrl-w l` leaves the editor
+            // open and moves the keystrokes to the metadata panel, and a caret
+            // blinking in a block that no longer receives them is a lie about
+            // where the next character lands.
+            if app.focus == Focus::Main {
+                edit_caret = caret;
+            }
         } else {
             let mut ls = block_lines(app, row, width, selected);
             if in_visual && !selected {
@@ -364,6 +380,11 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
             bar,
         );
     }
+    // A row highlight says which block is selected; only the block editor has a
+    // caret, and that caret is the terminal's own cursor.
+    if let Some(at) = edit_caret {
+        place_caret(f, inner, at);
+    }
     caret.or(sel_y.map(|y| (inner.x + 4, y)))
 }
 
@@ -411,10 +432,23 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
     prefix.push(Span::styled(bullet, bullet_style));
 
     let prefix_w = prefix_width(&prefix);
-    let text_w = width.saturating_sub(prefix_w);
     // A block with links says so, so that "can I go somewhere from here?" is
     // answerable by looking. `Ctrl-]` / `gf` follows them.
     let links = crate::model::parse_refs(&row.content).len();
+    // Those markers ride at the end of the first line, so the text has to leave
+    // room for them: they were being appended past the pane width, and the
+    // Paragraph wrapped them onto an extra display row, which pushed every row
+    // below down by one while the caret above kept its old idea of the row.
+    let marker_w = if links > 0 {
+        format!(" ↗{}", links).chars().count()
+    } else {
+        0
+    } + if row.collapsed && row.has_children {
+        format!("  ▸ {} collapsed", row.child_count).chars().count()
+    } else {
+        0
+    };
+    let text_w = width.saturating_sub(prefix_w + marker_w);
     let mut out: Vec<Line> = Vec::new();
     // Alt-Enter puts real newlines inside one block; render them as continuation
     // lines that hang under the text, not under the bullet.
@@ -478,15 +512,24 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
     };
     prefix.push(Span::styled(bullet, Style::default().fg(theme::CARET).bg(bg)));
     let hang = " ".repeat(prefix_width(&prefix));
+    let prefix_w = prefix_width(&prefix);
 
     let text: String = ed.chars.iter().collect();
     let styled = styled_chars(app, &text, bg, true);
-    // keep the caret on screen: one column narrower than the pane
-    let wrap_w = width.saturating_sub(prefix_width(&prefix) - 1).max(8);
+    // Every line we emit has to fit the pane outright. The `Paragraph` wrapping
+    // these lines uses word boundaries, so one cell of overflow does not clip --
+    // it moves a whole word to the next display row and every row below it (and
+    // the caret row with them) is off by one.
+    //
+    // The extra cell is the caret's: a line of `wrap_w` characters with the
+    // caret at its end needs one more cell than the text, and without the
+    // reservation that caret landed on the pane's right border.
+    let wrap_w = width.saturating_sub(prefix_w + 1).max(4);
     let lines_idx = wrap_ranges(&ed.chars, wrap_w);
 
     let mut out: Vec<Line<'static>> = Vec::new();
-    let mut caret = (prefix_width(&prefix) as u16, 0u16);
+    // The caret as (column, row) from the start of this block, on screen.
+    let mut caret: Option<(u16, u16)> = None;
     for (n, (start, end)) in lines_idx.iter().enumerate() {
         let mut spans: Vec<Span> = if n == 0 {
             prefix.clone()
@@ -494,27 +537,48 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
             vec![Span::styled(hang.clone(), Style::default().bg(bg))]
         };
         let mut run: Vec<(char, Style)> = Vec::new();
+        // Where the caret goes *within this line*, in characters of `run`.
+        let mut at: Option<usize> = None;
         for i in *start..*end {
             if i == ed.cursor {
-                caret = (prefix_width(&spans) as u16, n as u16);
-                if ed.fake_caret {
-                    run.push(('▏', Theme::caret().bg(bg)));
-                }
+                at = Some(run.len());
             }
             if let Some((c, st)) = styled.get(i) {
                 run.push((*c, st.patch(Style::default().bg(bg))));
             }
         }
-        if ed.cursor >= *end && (ed.cursor == *end) && n + 1 == lines_idx.len() {
-            caret = ((prefix_width(&spans) + run.len()) as u16, n as u16);
-            if ed.fake_caret {
-                run.push(('▏', Theme::caret().bg(bg)));
-            }
+        // A cursor sitting on a character we never draw -- the newline that ends
+        // this line, or the end of the text -- belongs at the end of this line.
+        // Without this the caret fell back to the start of the block, which is
+        // how it could point at the wrong line entirely.
+        if at.is_none() && ed.cursor == *end {
+            at = Some(run.len());
+        }
+        if let Some(i) = at {
+            run.insert(i, ('▏', Theme::caret().bg(bg)));
+            caret = Some(((prefix_w + i) as u16, n as u16));
         }
         spans.extend(runs_to_spans(run));
         out.push(Line::from(spans));
     }
-    (out, caret)
+    (out, caret.unwrap_or((prefix_w as u16, 0)))
+}
+
+/// Put the terminal's own cursor where the caret is. ratatui hides the cursor
+/// unless something places it, so a caret that exists only as a glyph is a caret
+/// you cannot see moving. Kept *as well as* the glyph: the glyph survives a
+/// screenshot (`--dump`) and terminals that would rather not blink.
+///
+/// Off-pane positions are dropped rather than fudged: if the caret has scrolled
+/// out of the outline, a cursor drawn at the edge would be a lie about where the
+/// next character lands.
+fn place_caret(f: &mut Frame, area: Rect, at: (u16, u16)) -> bool {
+    let (x, y) = at;
+    if x < area.x || y < area.y || x >= area.right() || y >= area.bottom() {
+        return false;
+    }
+    f.set_cursor_position(Position { x, y });
+    true
 }
 
 /// The page-metadata panel, shown by `Ctrl-M`. It leads with what the page *is*
@@ -1065,25 +1129,27 @@ fn render_palette(f: &mut Frame, app: &App, p: &crate::app::Palette, bounds: Rec
     f.render_widget(block, rect);
 
     let rows = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(inner);
-    let prompt = if p.query.is_empty() {
-        "type to search page names and block text".to_string()
+    let caret_style = Style::default().fg(theme::CARET).bg(theme::PANEL_ALT);
+    let mut prompt: Vec<Span> = vec![Span::styled(
+        "› ",
+        Style::default().fg(theme::ACCENT).bg(theme::PANEL_ALT).bold(),
+    )];
+    if p.query.is_empty() {
+        // The caret sits where typing lands, and the placeholder reads after it.
+        // Parking the caret at the end of the hint text put it in the wrong
+        // place, which is the sort of thing a cursor is supposed to tell you.
+        prompt.push(Span::styled("▏", caret_style));
+        prompt.push(Span::styled(
+            "type to search page names and block text",
+            Theme::overlay().fg(theme::FAINT),
+        ));
     } else {
-        p.query.clone()
-    };
+        prompt.push(Span::styled(p.query.clone(), Theme::overlay()));
+        prompt.push(Span::styled("▏", caret_style));
+    }
     f.render_widget(
         Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled("› ", Style::default().fg(theme::ACCENT).bg(theme::PANEL_ALT).bold()),
-                Span::styled(
-                    prompt,
-                    if p.query.is_empty() {
-                        Theme::overlay().fg(theme::FAINT)
-                    } else {
-                        Theme::overlay()
-                    },
-                ),
-                Span::styled("▏", Style::default().fg(theme::CARET).bg(theme::PANEL_ALT)),
-            ]),
+            Line::from(prompt),
             Line::from(Span::styled(
                 "─".repeat(inner.width as usize),
                 Theme::faint().bg(theme::PANEL_ALT),
@@ -1091,6 +1157,11 @@ fn render_palette(f: &mut Frame, app: &App, p: &crate::app::Palette, bounds: Rec
         ])
         .style(Theme::overlay()),
         rows[0],
+    );
+    let _ = place_caret(
+        f,
+        rows[0],
+        (inner.x + 2 + p.query.chars().count() as u16, rows[0].y),
     );
 
     if p.items.is_empty() {
@@ -1163,31 +1234,44 @@ fn render_search(f: &mut Frame, app: &mut App, area: Rect) {
         width: cols[0].width.saturating_sub(2),
         height: cols[0].height.saturating_sub(2),
     };
+    let mut prompt: Vec<Span> = vec![Span::styled(
+        "▸ ",
+        Style::default().fg(theme::ACCENT).bg(theme::PANEL).bold(),
+    )];
+    if app.search_query.is_empty() {
+        prompt.push(Span::styled(
+            "▏",
+            Style::default().fg(theme::CARET).bg(theme::PANEL),
+        ));
+        prompt.push(Span::styled(
+            "type to search every block",
+            Theme::panel().fg(theme::FAINT),
+        ));
+    } else {
+        prompt.push(Span::styled(
+            app.search_query.clone(),
+            Theme::panel().fg(theme::FG).bold(),
+        ));
+        prompt.push(Span::styled(
+            "▏",
+            Style::default().fg(theme::CARET).bg(theme::PANEL),
+        ));
+    }
+    let _ = place_caret(
+        f,
+        inner,
+        (inner.x + 2 + app.search_query.chars().count() as u16, inner.y),
+    );
+    prompt.push(Span::styled(
+        if app.db.stats.fts {
+            "   FTS5 · porter unicode61"
+        } else {
+            "   LIKE fallback"
+        },
+        Theme::faint(),
+    ));
     let mut lines = vec![
-        Line::from(vec![
-            Span::styled("▸ ", Style::default().fg(theme::ACCENT).bg(theme::PANEL).bold()),
-            Span::styled(
-                if app.search_query.is_empty() {
-                    "type to search every block".to_string()
-                } else {
-                    app.search_query.clone()
-                },
-                if app.search_query.is_empty() {
-                    Theme::panel().fg(theme::FAINT)
-                } else {
-                    Theme::panel().fg(theme::FG).bold()
-                },
-            ),
-            Span::styled("▏", Style::default().fg(theme::CARET).bg(theme::PANEL)),
-            Span::styled(
-                if app.db.stats.fts {
-                    "   FTS5 · porter unicode61"
-                } else {
-                    "   LIKE fallback"
-                },
-                Theme::faint(),
-            ),
-        ]),
+        Line::from(prompt),
         Line::from(Span::styled(
             "─".repeat(inner.width as usize),
             Theme::faint(),
@@ -1643,18 +1727,17 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
     }
     let left = Line::from(spans);
 
-    // Quiet on the right: no engine trivia, no WAL sizes, no snapshot nag. The
-    // one thing worth a chip is the pane you hid, so it is not a mystery.
-    let mut right_spans: Vec<Span> = Vec::new();
-    if !app.show_meta {
-        right_spans.push(Span::styled(
-            " Ctrl-M page metadata ",
-            Theme::statusbar().fg(theme::FAINT),
+    // The right end is the ruler, and only the ruler: where the caret is inside
+    // the block being edited, in vim's `line,col`. Everything else that used to
+    // live here was engine trivia or a second copy of the hint bar, so when the
+    // caret is in the tree this space is simply blank.
+    let mut right = Line::from(Vec::<Span>::new());
+    if let Some((line, col)) = app.caret_ruler() {
+        right = Line::from(Span::styled(
+            format!("line {}, col {} ", line, col),
+            Theme::statusbar().fg(theme::CARET),
         ));
     }
-    // Quiet on the right, and not a second copy of the hint bar: the hints
-    // already advertise whatever is relevant, including Ctrl-M.
-    let right = Line::from(Vec::<Span>::new());
 
     let halves = Layout::horizontal([Constraint::Min(40), Constraint::Length(40)]).split(area);
     f.render_widget(Paragraph::new(left).style(Theme::statusbar()), halves[0]);
@@ -1844,6 +1927,11 @@ fn render_ex(f: &mut Frame, app: &App, area: Rect) {
             Style::default().fg(theme::ORANGE).bg(theme::PANEL_ALT),
         ));
     }
+    let _ = place_caret(
+        f,
+        area,
+        (area.x + 1 + ex.input.chars().count() as u16, area.y),
+    );
     f.render_widget(Paragraph::new(Line::from(spans)).style(Theme::overlay()), area);
 }
 
@@ -1884,6 +1972,14 @@ fn render_sql(f: &mut Frame, app: &App, area: Rect) {
         ])
         .style(Theme::panel()),
         prompt_area,
+    );
+    let _ = place_caret(
+        f,
+        prompt_area,
+        (
+            prompt_area.x + 8 + console.input.chars().count() as u16,
+            prompt_area.y,
+        ),
     );
 
     f.render_widget(panel("RESULT", false, None), rows[1]);
@@ -2039,9 +2135,14 @@ pub fn caret_position_for(app: &App) -> Option<Position> {
 mod render_tests {
     use crate::app::{App, View};
     use crate::db::Db;
+    use crate::editor::Editor;
     use crate::model::PageKind;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::backend::TestBackend;
+    use ratatui::layout::Position;
     use ratatui::Terminal;
+
+    use super::{block_lines, editor_lines};
 
     fn app(name: &str) -> App {
         let path =
@@ -2115,5 +2216,226 @@ mod render_tests {
             shown > hidden,
             "showing the panel must paint more, not the same ({hidden} -> {shown})"
         );
+    }
+
+    // ------------------------------------------------------- the caret
+
+    fn draw(app: &mut App, w: u16, h: u16) -> Terminal<TestBackend> {
+        let mut term = Terminal::new(TestBackend::new(w, h)).expect("terminal");
+        term.draw(|f| crate::ui::render(f, app)).expect("draw");
+        term
+    }
+
+    /// The bottom row is the hint bar, so the status line is the one above it.
+    fn status_line(term: &Terminal<TestBackend>, w: u16, h: u16) -> String {
+        let buf = term.backend().buffer();
+        (0..w)
+            .map(|x| buf[(x, h - 2)].symbol())
+            .collect::<String>()
+            .trim_end()
+            .to_string()
+    }
+
+    fn glyph_at(term: &Terminal<TestBackend>, x: u16, y: u16) -> String {
+        term.backend().buffer()[(x, y)].symbol().to_string()
+    }
+
+    fn press(app: &mut App, c: char) {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+
+    /// The widest line `block_lines` would hand to the `Paragraph`.
+    fn block_lines_longest(app: &App, row: &crate::model::Row, w: usize) -> usize {
+        block_lines(app, row, w, true)
+            .iter()
+            .map(|l| l.width())
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The whole point: the terminal's cursor is the caret, the caret glyph is
+    /// drawn where the cursor is, and the ruler says the same thing in words.
+    /// Before this the cursor lived only in screenshots -- `fake_caret` was set
+    /// by the mockup dumper and by nothing else, so in a real terminal the caret
+    /// was invisible.
+    #[test]
+    fn the_caret_is_the_terminal_cursor_and_the_ruler_names_it() {
+        let mut a = app("caret_cursor");
+        let first = a.rows[0].id;
+        a.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(a.editor.is_some(), "Enter puts the caret in the block");
+        if let Some(ed) = a.editor.as_mut() {
+            ed.cursor = 3;
+        }
+
+        let term = draw(&mut a, 100, 30);
+        assert!(
+            term.backend().cursor_visible(),
+            "a caret you cannot see is not a caret"
+        );
+        let at = term.backend().cursor_position();
+        // Pane border one column in, then the "▌" and the "• " bullet.
+        assert_eq!(at, Position { x: 7, y: 1 });
+        assert_eq!(glyph_at(&term, at.x, at.y), "▏", "the glyph and the cursor agree");
+        assert!(
+            status_line(&term, 100, 30).contains("line 1, col 4"),
+            "the ruler reads the same position: {}",
+            status_line(&term, 100, 30)
+        );
+        let _ = first;
+    }
+
+    /// A cursor sitting *on* the newline that ends a line used to fall through
+    /// both placement branches and land on the first row of the block, pointing
+    /// at a line the caret was not on.
+    #[test]
+    fn the_caret_keeps_its_line_when_it_sits_on_a_newline() {
+        let a = app("caret_newline");
+        let row = a.rows[0].clone();
+        let mut ed = Editor::new(row.id, &row.uuid, "one\ntwo", 0);
+
+        ed.cursor = 3; // on the "\n" itself
+        let (lines, caret) = editor_lines(&a, &ed, 40, &row);
+        assert_eq!(caret.1, 0, "the newline still belongs to the first line");
+        assert_eq!(caret.0 as usize, 3 + 3, "after the three characters");
+        assert_eq!(lines.len(), 2);
+
+        ed.cursor = 4; // first character of the second line
+        let (_, caret) = editor_lines(&a, &ed, 40, &row);
+        assert_eq!(caret.1, 1, "and this one is on the second");
+
+        ed.cursor = 7; // end of the text
+        let (_, caret) = editor_lines(&a, &ed, 40, &row);
+        assert_eq!((caret.0 as usize, caret.1), (3 + 3, 1));
+
+        ed.cursor = 5;
+        let (_, caret) = editor_lines(&a, &ed, 40, &row);
+        assert_eq!((caret.0 as usize, caret.1), (3 + 1, 1));
+    }
+
+    /// Every line handed to the `Paragraph` has to fit the pane, because that
+    /// `Paragraph` wraps on word boundaries: one cell of overflow moves a whole
+    /// word to the next display row and every row below it shifts, which is
+    /// exactly how a caret ends up pointing at the wrong place.
+    #[test]
+    fn no_line_is_wider_than_the_pane() {
+        let a = app("wrap_fits");
+        let row = a.rows[0].clone();
+
+        for w in [24usize, 40, 61, 120] {
+            for long in ["word ".repeat(80), "x".repeat(300)] {
+                let mut ed = Editor::new(row.id, &row.uuid, &long, 0);
+                // Every cursor position, not a sample: the case that hurts is a
+                // full line with the caret at its end, one cell wider than the
+                // line, and that is one index among hundreds.
+                for cursor in 0..=long.len() {
+                    ed.cursor = cursor;
+                    let (lines, _) = editor_lines(&a, &ed, w, &row);
+                    for l in &lines {
+                        assert!(
+                            l.width() <= w,
+                            "editor line of {} cells in a {w}-cell pane (cursor {cursor})",
+                            l.width()
+                        );
+                    }
+                }
+            }
+
+            // A block with links carries a "↗1" marker past the text; the room
+            // for it has to come out of the text width, not out of the pane.
+            let linked = a.rows[1].clone();
+            let rendered = block_lines_longest(&a, &linked, w);
+            assert!(rendered <= w, "block line of {rendered} cells at width {w}");
+        }
+    }
+
+    /// The provisional day: nothing has been written yet, the outline is empty,
+    /// and the caret is already waiting in the ghost first block. This is the
+    /// one moment where seeing the caret matters most, and it is a *different*
+    /// render path from a block that exists.
+    #[test]
+    fn the_caret_shows_in_a_provisional_journal() {
+        let mut a = app("caret_provisional");
+        a.set_view(View::Journal(crate::model::JournalDay::new(crate::db::today())));
+        assert!(a.rows.is_empty(), "today has no blocks, so the ghost is used");
+        a.begin_provisional();
+        assert!(a.editor.is_some());
+
+        let term = draw(&mut a, 100, 30);
+        assert!(term.backend().cursor_visible());
+        let at = term.backend().cursor_position();
+        assert_eq!(glyph_at(&term, at.x, at.y), "▏");
+        assert!(
+            status_line(&term, 100, 30).contains("line 1, col 1"),
+            "{}",
+            status_line(&term, 100, 30)
+        );
+    }
+
+    /// Focus moves the cursor with it: an editor left open behind a focused
+    /// metadata panel must not keep blinking where keystrokes no longer go.
+    #[test]
+    fn the_cursor_follows_the_focus() {
+        let mut a = app("caret_focus");
+        a.show_meta = true;
+        a.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(a.editor.is_some());
+        let term = draw(&mut a, 120, 30);
+        assert!(term.backend().cursor_visible(), "the block has the focus");
+
+        a.focus_right();
+        assert_eq!(a.focus, crate::app::Focus::Right);
+        let term = draw(&mut a, 120, 30);
+        assert!(
+            !term.backend().cursor_visible(),
+            "the metadata panel has the keystrokes now"
+        );
+    }
+
+    /// The row highlight is the tree's position indicator, so the hardware cursor
+    /// stays out of the way there instead of blinking on a bullet.
+    #[test]
+    fn the_tree_has_no_hardware_cursor() {
+        let mut a = app("caret_tree");
+        a.text_focus = false;
+        a.editor = None;
+        let term = draw(&mut a, 100, 30);
+        assert!(!term.backend().cursor_visible());
+        assert!(
+            !status_line(&term, 100, 30).contains("col "),
+            "and no ruler either: {}",
+            status_line(&term, 100, 30)
+        );
+    }
+
+    /// Same invariant in the other inputs: the cursor lands on the caret glyph,
+    /// including in an empty Find box, where the glyph used to sit at the end of
+    /// the placeholder text instead of at the insertion point.
+    #[test]
+    fn every_input_puts_the_cursor_on_its_caret() {
+        let mut a = app("caret_inputs");
+
+        a.open_palette();
+        let term = draw(&mut a, 100, 30);
+        let at = term.backend().cursor_position();
+        assert!(term.backend().cursor_visible());
+        assert_eq!(glyph_at(&term, at.x, at.y), "▏", "Find box, empty query");
+
+        a.palette_input('a');
+        a.palette_input('b');
+        let term = draw(&mut a, 100, 30);
+        let at_moved = term.backend().cursor_position();
+        assert_eq!(at_moved.x, at.x + 2, "the cursor follows the typing");
+        assert_eq!(at_moved.y, at.y);
+        assert_eq!(glyph_at(&term, at_moved.x, at_moved.y), "▏");
+
+        a.palette = None;
+        press(&mut a, ':');
+        assert!(a.ex.is_some(), "`:` opens the command line");
+        press(&mut a, 'w');
+        press(&mut a, 'q');
+        let term = draw(&mut a, 100, 30);
+        let at = term.backend().cursor_position();
+        assert_eq!(glyph_at(&term, at.x, at.y), "▏", "command line");
     }
 }

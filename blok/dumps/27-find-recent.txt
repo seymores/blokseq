@@ -5,7 +5,7 @@
 │ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
 │ │ • Export format settled: the SQLite file *is* the format                                                                               │
 │ │ ▾ TODO Ask Dana whether the╭ Find  recent ──────────────────────────────────────────────────────────────╮                              │
-│ │ │ • deadline:: 2026-02-20  │› type to search page names and block text▏                                 │                              │
+│ │ │ • deadline:: 2026-02-20  │› ▏type to search page names and block text                                 │                              │
 │       priority:: A           │────────────────────────────────────────────────────────────────────────────│                              │
 │ │ • DOING Write up the sync s│ ▸ 3d ago  (2026-10-05)          journal · 3d ago · 2 blocks                │                              │
 │ ▾ Idea: journals are rows, no│   2d ago  (2026-10-06)          journal · 2d ago · 1 block                 │                              │

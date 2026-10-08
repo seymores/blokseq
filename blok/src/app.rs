@@ -221,8 +221,6 @@ pub struct App {
     pub upload_desc: Option<String>,
     pub integrity: String,
 
-    /// Mockup dumps set this so the caret survives a screenshot.
-    pub fake_caret: bool,
     /// Mockup dumps use a fixed clock string.
     pub clock: String,
     pub journal_day: JournalDay,
@@ -281,7 +279,6 @@ impl App {
             pruned_blocks: 0,
             upload_desc: None,
             integrity: String::new(),
-            fake_caret: false,
             clock: chrono::Local::now().format("%H:%M").to_string(),
             journal_day: JournalDay::new(today),
         };
@@ -487,6 +484,14 @@ impl App {
 
     // -------------------------------------------------------------- editing
 
+    /// The caret's position inside the block being edited, 1-based
+    /// `(line, column)` -- vim's ruler. `None` when the caret is in the tree
+    /// rather than in a block's text, so the status bar leaves the space blank
+    /// instead of inventing a position.
+    pub fn caret_ruler(&self) -> Option<(usize, usize)> {
+        self.editor.as_ref().map(|ed| ed.position())
+    }
+
     pub fn begin_edit(&mut self) {
         let Some(row) = self.selected_row().cloned() else {
             return;
@@ -497,8 +502,7 @@ impl App {
     /// Start typing in a journal day that has no row yet. Nothing is written
     /// until the first keystroke is committed: the day is a view, not a file.
     pub fn begin_provisional(&mut self) {
-        let mut ed = Editor::new(-1, "", "", 0);
-        ed.fake_caret = self.fake_caret;
+        let ed = Editor::new(-1, "", "", 0);
         self.editor = Some(ed);
         self.mode = Mode::Insert;
     }
@@ -510,8 +514,7 @@ impl App {
         let Some(row) = self.selected_row().cloned() else {
             return;
         };
-        let mut ed = Editor::new(row.id, &row.uuid, &row.content, row.depth);
-        ed.fake_caret = self.fake_caret;
+        let ed = Editor::new(row.id, &row.uuid, &row.content, row.depth);
         self.editor = Some(ed);
         self.mode = Mode::Insert;
     }

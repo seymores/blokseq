@@ -73,9 +73,6 @@ pub struct Editor {
     /// Selection anchor for Visual mode / shift-selection.
     pub anchor: Option<usize>,
     pub dirty: bool,
-    /// Displayed caret glyph. In a real terminal the hardware cursor is used;
-    /// mockup dumps set this so the caret survives a text/PNG screenshot.
-    pub fake_caret: bool,
     pub indent: usize,
 }
 
@@ -91,9 +88,18 @@ impl Editor {
             mode: Mode::Insert,
             anchor: None,
             dirty: false,
-            fake_caret: false,
             indent,
         }
+    }
+
+    /// The caret as vim's ruler reads it: 1-based `(line, column)` *inside this
+    /// block*, counting the real newlines that `Alt-⏎` inserts. Soft wrapping is
+    /// a display detail and does not move the ruler, exactly as in vim.
+    pub fn position(&self) -> (usize, usize) {
+        let before = &self.chars[..self.cursor.min(self.chars.len())];
+        let line = before.iter().filter(|c| **c == '\n').count() + 1;
+        let col = before.iter().rev().take_while(|c| **c != '\n').count() + 1;
+        (line, col)
     }
 
     pub fn text(&self) -> String {
@@ -422,5 +428,44 @@ pub fn fuzzy(needle: &str, hay: &str) -> Option<(i32, Vec<usize>)> {
         Some((score, pos))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ed(text: &str, cursor: usize) -> Editor {
+        let mut e = Editor::new(1, "blk-1", text, 0);
+        e.cursor = cursor;
+        e
+    }
+
+    /// The ruler is what the status bar shows, so it is worth being exact about
+    /// it: 1-based, and a newline is a line, not a column.
+    #[test]
+    fn position_is_one_based_line_and_column() {
+        let e = ed("hello", 0);
+        assert_eq!(e.position(), (1, 1));
+        let e = ed("hello", 5);
+        assert_eq!(e.position(), (1, 6), "the end of the text is one past it");
+        let e = ed("hello", 2);
+        assert_eq!(e.position(), (1, 3));
+
+        let e = ed("one\ntwo", 4);
+        assert_eq!(e.position(), (2, 1), "just after the newline is column 1");
+        let e = ed("one\ntwo", 3);
+        assert_eq!(e.position(), (1, 4), "on the newline, still line 1");
+        let e = ed("one\ntwo", 7);
+        assert_eq!(e.position(), (2, 4));
+    }
+
+    /// A cursor that cannot be past the end: `set_text` clamps it, and the ruler
+    /// must not index out of bounds if some other path forgets to.
+    #[test]
+    fn position_survives_a_cursor_past_the_end() {
+        let mut e = ed("abc", 0);
+        e.cursor = 99;
+        assert_eq!(e.position(), (1, 4));
     }
 }

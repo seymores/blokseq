@@ -25,7 +25,7 @@ cargo run -- --db ./scratch.db        # use a throwaway database
 cargo run -- --dump dumps             # re-render every mockup frame
 cargo run -- --demo-lifecycle         # print the journal create/prune trace
 cargo run -- --stats                  # row counts, FTS5 availability, integrity
-cargo test                            # 10 key-router regression tests
+cargo test                            # 31 regression tests, one per bug
 ```
 
 Dependencies: `ratatui` 0.30, `crossterm` 0.29, `rusqlite` 0.40 (`bundled`, so
@@ -41,7 +41,7 @@ src/
   editor.rs    single-block editor: cursor, soft wrap, `[[`/`((`/`/` triggers
   app.rs       state machine: views, panes, structural edits, undo, keymap
   ui.rs        every screen (the mockups are this file's real output)
-  mockups.rs   the 22 framed fixtures driven through the real renderer
+  mockups.rs   the 29 framed fixtures driven through the real renderer
   theme.rs     palette, badges, TODO cycling
 dumps/         NN-name.txt (plain) · NN-name.ans (24-bit) · png/ (rasterised)
 tools/         render_png.py — ANSI frame -> PNG screenshot
