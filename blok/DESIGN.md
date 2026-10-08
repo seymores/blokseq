@@ -683,10 +683,13 @@ Being explicit about this matters more than the demo looking good.
   outdent, reorder, soft delete, fold, undo of the last three of those.
 * `VACUUM INTO` snapshots while the database is open, `backup_log` history, the
   integrity check, and `wal_checkpoint` before measuring.
-* The key router is covered by 10 regression tests (`cargo test`): `q`, `ZZ`,
-  `ZQ` and `:q` all end the session; `Esc` walks the vim ladder; `dd` + `u`
-  round-trips a block; `Ctrl-]` follows a link; panel toggles persist; the
-  console refuses a `DELETE`.
+* The key router is covered by 16 regression tests (`cargo test`), one per bug
+  this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
+  commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
+  the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
+  links; `Ctrl-P` opens a filtered page; `Ctrl-w h` reaches the sidebar and `⏎`
+  opens from it; panel toggles persist; a message clears on the next keypress;
+  the console refuses a `DELETE`.
 * All 28 frames in this document are the app's own renderer.
 
 **Mocked or stubbed (and flagged as such):**
