@@ -189,8 +189,12 @@ pub struct App {
     pub undo: Vec<UndoOp>,
     pub redo: Vec<UndoOp>,
 
-    /// The linked-references pane is the one panel left, and it stays a toggle.
-    pub show_refs: bool,
+    /// The page-metadata panel: metadata, linked and unlinked references. Off by
+    /// default -- it is something you ask for with `Ctrl-M`, not furniture you
+    /// live with.
+    pub show_meta: bool,
+    /// Cached for the page currently open, refreshed by `load_view`.
+    pub meta: Option<crate::db::PageMeta>,
 
     pub right_selected: usize,
     pub linked: Vec<(String, Vec<RefHit>)>,
@@ -224,7 +228,8 @@ impl App {
     pub fn new(db: Db, today: NaiveDate) -> Self {
         // Whether the references pane is showing is a preference, not a
         // hard-coded layout. There is no sidebar to prefer any more.
-        let show_refs = db.bool_setting("show_refs", true);
+        // Off unless the user turned it on: metadata is asked for, not given.
+        let show_meta = db.bool_setting("show_meta", false);
         let mut app = Self {
             db,
             today,
@@ -253,7 +258,8 @@ impl App {
             history_pos: 0,
             undo: Vec::new(),
             redo: Vec::new(),
-            show_refs,
+            show_meta,
+            meta: None,
             right_selected: 0,
             linked: Vec::new(),
             linked_selected: 0,
@@ -314,12 +320,20 @@ impl App {
         self.clamp_selection();
     }
 
+    /// The page currently open, for tests and for the metadata panel.
+    pub fn view_meta_id(&self) -> Option<i64> {
+        self.page_id
+    }
+
     pub fn load_right(&mut self) {
         self.linked = match self.page_id {
             Some(id) => self.db.linked_refs(id),
             None => Vec::new(),
         };
         self.linked_selected = 0;
+        // The metadata panel's header: fetched with the references so one
+        // refresh keeps the whole panel consistent.
+        self.meta = self.page_id.and_then(|id| self.db.page_meta(id));
         // Unlinked references: blocks that mention the title as plain text.
         self.unlinked = match &self.view {
             View::Page(name) => {
@@ -1400,7 +1414,7 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("gg G", "first · last block", "Normal"),
     ("Ctrl-d / Ctrl-u", "half page down / up", "Normal"),
     ("[ / ]", "previous / next journal day", "Normal"),
-    ("Ctrl-w h l w", "focus sidebar · references · cycle", "Normal"),
+    ("Ctrl-w l", "focus the metadata panel (once shown)", "Normal"),
     ("Following links", "", ""),
     ("Ctrl-]", "follow the link here (menu when there are several)", "Normal"),
     ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
@@ -1431,8 +1445,8 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("Ctrl-w l", "focus the references pane", "Normal"),
     ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
     ("Panels and troubleshooting", "", ""),
-    ("Ctrl-b", "show / hide the linked references", "Any"),
-    (":set refs | norefs", "the same, spelled out, and persisted", "Ex"),
+    ("Ctrl-M", "show / hide page metadata (facts, refs, mentions)", "Any"),
+    (":set meta | nometa", "the same, spelled out, and persisted", "Ex"),
     (":sql", "read-only SQL console, on demand", "Ex"),
     (":w", "snapshot + queue for the remote", "Ex"),
     ("Ctrl-S", "snapshot, then the storage screen", "Any"),
@@ -1450,7 +1464,7 @@ pub const EX_COMMANDS: &[(&str, &str)] = &[
     ("wq", "snapshot, then quit"),
     ("q", "quit (prunes empty journals)"),
     ("q!", "quit without the prune pass"),
-    ("set ", "`set refs`, `set norefs`"),
+    ("set ", "`set meta`, `set nometa`"),
     ("board", "open the TODO board"),
     ("storage", "storage and backup screen"),
     ("today", "jump to today's journal"),

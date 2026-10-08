@@ -1,12 +1,12 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────╮╭ LINKED REFERENCES  2 ────────────────╮
-│▌▾ Deep work 09:00–12:30 on the block store                                                       ││Project Aurora (1)                    │
-│ │ • Replaced the integer  position  with a fractional index                                      ││· Storage argument lives in ((blk-0…  │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││                                      │
-│ ▾ Standup — [[Project Aurora]] ↗1                                                                ││Yesterday (1)                         │
-│ │ • Export format settled: the SQLite file *is* the format                                       ││· Touches ((blk-00000016)) — the fr…  │
+╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│▌▾ Deep work 09:00–12:30 on the block store                                                                                               │
+│ │ • Replaced the integer  position  with a fractional index                                                                              │
+│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
+│ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
+│ │ • Export format settled: the SQLite file *is* the format                                                                               │
 │ │ ▾ TODO Ask Dana whether the╭ Find  recent ──────────────────────────────────────────────────────────────╮                              │
-│ │ │ • deadline:: 2026-02-20  │› type to search page names and block text▏                                 │──────────────────────────────│
-│       priority:: A           │────────────────────────────────────────────────────────────────────────────│ (mentions of this title)     │
+│ │ │ • deadline:: 2026-02-20  │› type to search page names and block text▏                                 │                              │
+│       priority:: A           │────────────────────────────────────────────────────────────────────────────│                              │
 │ │ • DOING Write up the sync s│ ▸ 3d ago  (2026-10-05)          journal · 3d ago · 2 blocks                │                              │
 │ ▾ Idea: journals are rows, no│   2d ago  (2026-10-06)          journal · 2d ago · 1 block                 │                              │
 │ │ • An empty day should not e│   Yesterday  (2026-10-07)       journal · Yesterday · 2 blocks             │                              │
@@ -18,25 +18,25 @@
 │                              │   Weekly review                 last: Friday 16:00 — sweep the journal …   │                              │
 │                              │   blok TUI                      last: blok TUI — outliner for the termi…   │                              │
 │                              ╰────────────────────────────────────────────────────────────────────────────╯                              │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  Ctrl-P with no query: what you touched last   type to search page names and block text
  NORMAL    1/12
- j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev / next day   / search
+ Ctrl-M page metadata   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev

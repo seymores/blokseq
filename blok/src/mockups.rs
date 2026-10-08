@@ -76,6 +76,15 @@ fn seed(app: &mut App) {
             "Project Aurora — offline-first note sync for field teams",
         )
         .id;
+    // Page properties: a top-level `key:: value` block, which is where the
+    // metadata panel reads them from.
+    app.db.create_block(
+            aurora.id,
+            None,
+            None,
+            "status:: active\nowner:: Dana\nreview:: Fridays",
+        )
+        .id;
     let a1a = app
         .db
         .create_block(
@@ -553,6 +562,7 @@ fn cases() -> Vec<Case> {
             height: 38,
             build: |app| {
                 app.goto_page("Project Aurora");
+                app.show_meta = true;
                 app.focus = Focus::Right;
                 app.linked_selected = 2;
             },
@@ -718,17 +728,17 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
-            name: "26-refs-hidden",
+            name: "26-page-metadata",
             width: 118,
             height: 38,
             build: |app| {
                 app.goto_today();
                 app.select_containing("Standup");
-                app.show_refs = false;
+                app.show_meta = true;
                 app.toast(
                     ToastKind::Info,
-                    "references hidden — the outline gets the whole width",
-                    Some("Ctrl-b brings them back · :set norefs"),
+                    "Ctrl-M: what this page is, and what points at it",
+                    Some("hidden by default · :set meta keeps it on"),
                 );
             },
         },

@@ -1,42 +1,42 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────╮╭ LINKED REFERENCES  2 ────────────────╮
-│ ▾ Deep work 09:00–12:30 on the block store                                                       ││Project Aurora (1)                    │
-│ │ • Replaced the integer  position  with a fractional index                                      ││· Storage argument lives in ((blk-0…  │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││                                      │
-│ ▾ Standup — [[Project Aurora]] ↗1                                                                ││Yesterday (1)                         │
-│ │ • Export format settled: the SQLite file *is* the format                                       ││· Touches ((blk-00000016)) — the fr…  │
-│▌│ ▾ TODO Ask Dana whether the trial keys rotate monthly                                          ││                                      │
-│ │ │ • deadline:: 2026-02-20                                                                      ││──────────────────────────────────────│
-│       priority:: A                                                                               ││UNLINKED (mentions of this title)     │
-│ │ • DOING Write up the sync story for [[blok TUI]] ↗1                                            ││· none                                │
-│ ▾ Idea: journals are rows, not files #blok ↗1                                                    ││                                      │
-│ │ • An empty day should not exist anywhere — not on disk, not in the DB                          ││                                      │
-│ • Reading:  VACUUM INTO  semantics                                                               ││                                      │
-│ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync ↗3                                            ││                                      │
-│                                                                                                  ││                                      │
-│  • type here for the next block — or press o                                                     ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
+╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ▾ Deep work 09:00–12:30 on the block store                                                                                               │
+│ │ • Replaced the integer  position  with a fractional index                                                                              │
+│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
+│ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
+│ │ • Export format settled: the SQLite file *is* the format                                                                               │
+│▌│ ▾ TODO Ask Dana whether the trial keys rotate monthly                                                                                  │
+│ │ │ • deadline:: 2026-02-20                                                                                                              │
+│       priority:: A                                                                                                                       │
+│ │ • DOING Write up the sync story for [[blok TUI]] ↗1                                                                                    │
+│ ▾ Idea: journals are rows, not files #blok ↗1                                                                                            │
+│ │ • An empty day should not exist anywhere — not on disk, not in the DB                                                                  │
+│ • Reading:  VACUUM INTO  semantics                                                                                                       │
+│ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync ↗3                                                                                    │
+│                                                                                                                                          │
+│  • type here for the next block — or press o                                                                                             │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  Tab re-parents the block under its previous sibling   before — one Tab press
  NORMAL    6/12  depth 1
- j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev / next day   / search
+ Ctrl-M page metadata   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev

@@ -1,6 +1,6 @@
 ╭ SEARCH  2 hits · bm25 ────────────────────────────────────────────────────────╮╭ BLOCK PREVIEW ──────────────────────────────────────────╮
 │▸ snapshot▏   FTS5 · porter unicode61                                          ││source  Pages / Project Aurora                           │
-│───────────────────────────────────────────────────────────────────────────────││block   blk-00000007                                     │
+│───────────────────────────────────────────────────────────────────────────────││block   blk-00000008                                     │
 │▌ Project AuroraDOING Snapshot uploader (rclone backend)                       ││                                                         │
 │  Project AuroraOpen question #sync: what happens when two devices both sna    ││  DOING Snapshot uploader (rclone backend)               │
 │                                                                               ││                                                         │

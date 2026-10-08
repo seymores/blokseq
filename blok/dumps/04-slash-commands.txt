@@ -1,42 +1,42 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────╮╭ LINKED REFERENCES  2 ────────────────╮
-│ ▾ Deep work 09:00–12:30 on the block store                                                       ││Project Aurora (1)                    │
-│ │ • Replaced the integer  position  with a fractional index                                      ││· Storage argument lives in ((blk-0…  │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││                                      │
-│ ▾ Standup — [[Project Aurora]] ↗1                                                                ││Yesterday (1)                         │
-│ │ • Export format settled: the SQLite file *is* the format                                       ││· Touches ((blk-00000016)) — the fr…  │
-│▌│ ▾ /d▏                                                                                          ││                                      │
-│ │ │ • ╭ Block commands · /d ───────────────────────────────╮                                     ││──────────────────────────────────────│
-│       │▸ DOING                          command  in prog…  │                                     ││UNLINKED (mentions of this title)     │
-│ │ • DO│  DONE                           command  finished  │                                     ││· none                                │
-│ ▾ Idea│  Draw                           command  open th…  │                                     ││                                      │
-│ │ • An│  Deadline                       command  add a D…  │t in the DB                          ││                                      │
-│ • Read│  TODO                           command  mark th…  │                                     ││                                      │
-│ • Stor│  Code                           command  fenced …  │                                     ││                                      │
-│       │  Cards                          command  make th…  │                                     ││                                      │
-│  • typ│  Scheduled                      command  add a S…  │                                     ││                                      │
-│       │ ↑↓ choose  Tab complete  Esc cancel                │                                     ││                                      │
-│       ╰────────────────────────────────────────────────────╯                                     ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
+╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ▾ Deep work 09:00–12:30 on the block store                                                                                               │
+│ │ • Replaced the integer  position  with a fractional index                                                                              │
+│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
+│ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
+│ │ • Export format settled: the SQLite file *is* the format                                                                               │
+│▌│ ▾ /d▏                                                                                                                                  │
+│ │ │ • ╭ Block commands · /d ───────────────────────────────╮                                                                             │
+│       │▸ DOING                          command  in prog…  │                                                                             │
+│ │ • DO│  DONE                           command  finished  │                                                                             │
+│ ▾ Idea│  Draw                           command  open th…  │                                                                             │
+│ │ • An│  Deadline                       command  add a D…  │t in the DB                                                                  │
+│ • Read│  TODO                           command  mark th…  │                                                                             │
+│ • Stor│  Code                           command  fenced …  │                                                                             │
+│       │  Cards                          command  make th…  │                                                                             │
+│  • typ│  Scheduled                      command  add a S…  │                                                                             │
+│       │ ↑↓ choose  Tab complete  Esc cancel                │                                                                             │
+│       ╰────────────────────────────────────────────────────╯                                                                             │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    6/12  depth 1
  Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag

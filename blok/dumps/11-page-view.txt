@@ -1,42 +1,42 @@
-╭ Project Aurora  11 blocks · 2 refs ──────────────────────────────────────────────────────────────╮╭ LINKED REFERENCES  2 ────────────────╮
-│ ▾ Project Aurora — offline-first note sync for field teams                                       ││blok TUI (1)                          │
-│ │ • Constraint: laptops on 2G links for weeks at a time                                          ││· TODO Decide whether the TUI shoul…  │
-│▌│ • Decision: ship the SQLite file as the export format, not markdown                            ││                                      │
-│ │ • Rejected: markdown tree — 4k files, slow rename, no transactions                             ││Today (1)                             │
-│ ▾ Milestones                                                                                     ││· Standup — [[Project Aurora]]        │
-│ │ • TODO Single-file export + import round-trip                                                  ││                                      │
-│ │ ▾ DOING Snapshot uploader (rclone backend)                                                     ││──────────────────────────────────────│
-│ │ │ • DONE Conflict model: last-writer-wins per *block*, not per file                            ││UNLINKED (mentions of this title)     │
-│ │ • LATER On-device full-text reindex after a restore                                            ││· Project Aurora — offline-first note │
-│ • Storage argument lives in ((↗ Idea: journals are rows, no…)) (today's journal) ↗1              ││                                      │
-│ • Open question #sync: what happens when two devices both snapshot at 09:00? ↗1                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-│                                                                                                  ││                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
- NORMAL    3/11  depth 1
- j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev / next day   / search
+╭ Project Aurora  12 blocks · 2 refs ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ▾ Project Aurora — offline-first note sync for field teams                                                                               │
+│ │ • Constraint: laptops on 2G links for weeks at a time                                                                                  │
+│▌│ • Decision: ship the SQLite file as the export format, not markdown                                                                    │
+│ │ • Rejected: markdown tree — 4k files, slow rename, no transactions                                                                     │
+│ ▾ Milestones                                                                                                                             │
+│ │ • TODO Single-file export + import round-trip                                                                                          │
+│ │ ▾ DOING Snapshot uploader (rclone backend)                                                                                             │
+│ │ │ • DONE Conflict model: last-writer-wins per *block*, not per file                                                                    │
+│ │ • LATER On-device full-text reindex after a restore                                                                                    │
+│ • status:: active                                                                                                                        │
+│   owner:: Dana                                                                                                                           │
+│   review:: Fridays                                                                                                                       │
+│ • Storage argument lives in ((↗ Idea: journals are rows, no…)) (today's journal) ↗1                                                      │
+│ • Open question #sync: what happens when two devices both snapshot at 09:00? ↗1                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ NORMAL    3/12  depth 1
+ Ctrl-M page metadata   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev

@@ -60,7 +60,7 @@ impl JournalDay {
         )
     }
 
-    /// Compact label used in sidebars, e.g. `Fri 14`.
+    /// Compact day label, e.g. `Fri 14`.
     pub fn short(&self) -> String {
         self.date.format("%a %d").to_string()
     }

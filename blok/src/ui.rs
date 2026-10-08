@@ -78,8 +78,8 @@ pub fn render(f: &mut Frame, app: &mut App) {
 fn render_workspace(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16)> {
     let w = area.width;
     // References carry real text, so they need real width; below ~96 columns
-    // they crowd the outline and step aside, and the hint bar offers Ctrl-b.
-    let right_w = if !app.show_refs {
+    // they crowd the outline and step aside; Ctrl-M is one key away.
+    let right_w = if !app.show_meta {
         0
     } else if w >= 140 {
         40
@@ -517,15 +517,18 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
     (out, caret)
 }
 
+/// The page-metadata panel, shown by `Ctrl-M`. It leads with what the page *is*
+/// — kind, timestamps, counts, properties — and then the references, because
+/// "what is this page" and "what points at it" are the same question asked twice.
 fn render_refs(f: &mut Frame, app: &App, area: Rect) {
     let focused = app.focus == Focus::Right;
     let total: usize = app.linked.iter().map(|(_, v)| v.len()).sum();
     f.render_widget(
         panel(
-            "LINKED REFERENCES",
+            "PAGE METADATA",
             focused,
             Some(Span::styled(
-                format!(" {} ", total),
+                format!(" {} refs ", total),
                 Theme::section().fg(theme::ACCENT),
             )),
         ),
@@ -538,6 +541,58 @@ fn render_refs(f: &mut Frame, app: &App, area: Rect) {
         height: area.height.saturating_sub(2),
     };
     let mut lines: Vec<Line> = Vec::new();
+
+    // --- the metadata itself
+    if let Some(m) = app.meta.as_ref() {
+        let kv = |k: &str, v: String, color: ratatui::style::Color| {
+            Line::from(vec![
+                Span::styled(format!(" {:<11}", k), Theme::panel().fg(theme::FAINT)),
+                Span::styled(v, Style::default().fg(color).bg(theme::PANEL)),
+            ])
+        };
+        lines.push(kv(
+            "kind",
+            if m.is_journal { "journal" } else { "page" }.to_string(),
+            if m.is_journal { theme::GREEN } else { theme::ACCENT },
+        ));
+        lines.push(kv("created", short_stamp(&m.created_at), theme::DIM));
+        lines.push(kv("updated", short_stamp(&m.updated_at), theme::DIM));
+        lines.push(kv(
+            "blocks",
+            format!(
+                "{} block{}",
+                m.blocks,
+                if m.blocks == 1 { "" } else { "s" }
+            ),
+            theme::FG,
+        ));
+        lines.push(kv(
+            "links",
+            format!("{} in · {} out", m.refs_in, m.refs_out),
+            theme::FG,
+        ));
+        if m.properties.is_empty() {
+            lines.push(kv("properties", "none".into(), theme::FAINT));
+        } else {
+            for (k, v) in m.properties.iter().take(6) {
+                lines.push(kv(
+                    k,
+                    truncate(v, inner.width.saturating_sub(15) as usize),
+                    theme::CYAN,
+                ));
+            }
+        }
+        lines.push(Line::from(Span::styled(
+            "─".repeat(inner.width as usize),
+            Theme::faint(),
+        )));
+    }
+
+    // --- linked references
+    lines.push(Line::from(vec![
+        Span::styled("LINKED ", Theme::section()),
+        Span::styled(format!("({})", total), Theme::faint()),
+    ]));
     let mut idx = 0usize;
     for (page, hits) in &app.linked {
         let badge = if let Some(d) = crate::model::parse_journal_key(page) {
@@ -580,16 +635,12 @@ fn render_refs(f: &mut Frame, app: &App, area: Rect) {
     }
     if app.linked.is_empty() {
         lines.push(Line::from(Span::styled(
-            "no links yet",
-            Theme::dim().fg(theme::FAINT),
-        )));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "create one with [[page]] or ((block))",
+            " no links yet — [[page]] or ((block)) makes one",
             Theme::dim().fg(theme::FAINT),
         )));
     }
 
+    // --- unlinked mentions
     lines.push(Line::from(Span::styled(
         "─".repeat(inner.width as usize),
         Theme::faint(),
@@ -598,17 +649,31 @@ fn render_refs(f: &mut Frame, app: &App, area: Rect) {
         Span::styled("UNLINKED ", Theme::section()),
         Span::styled("(mentions of this title)", Theme::faint()),
     ]));
-    for name in app.unlinked.iter().take(3) {
-        let text: String = name.content.chars().take(inner.width as usize - 3).collect();
+    for name in app.unlinked.iter().take(4) {
+        let room = inner.width.saturating_sub(3) as usize;
         lines.push(Line::from(vec![
             Span::styled("· ", Theme::faint()),
-            Span::styled(text, Theme::panel().fg(theme::FAINT)),
+            Span::styled(
+                truncate(&name.content.replace('\n', " "), room),
+                Theme::panel().fg(theme::FAINT),
+            ),
         ]));
     }
     if app.unlinked.is_empty() {
         lines.push(Line::from(Span::styled("· none", Theme::faint())));
     }
     f.render_widget(Paragraph::new(lines).style(Theme::panel()), inner);
+}
+
+/// `2026-10-08T09:41:12` -> `2026-10-08 09:41`
+fn short_stamp(ts: &str) -> String {
+    let (d, t) = ts.split_once('T').unwrap_or((ts, ""));
+    let hhmm: String = t.chars().take(5).collect();
+    if hhmm.is_empty() {
+        d.to_string()
+    } else {
+        format!("{} {}", d, hhmm)
+    }
 }
 
 // ------------------------------------------------------------ inline parser
@@ -1571,22 +1636,15 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
     // Quiet on the right: no engine trivia, no WAL sizes, no snapshot nag. The
     // one thing worth a chip is the pane you hid, so it is not a mystery.
     let mut right_spans: Vec<Span> = Vec::new();
-    if !app.show_refs {
+    if !app.show_meta {
         right_spans.push(Span::styled(
-            " references hidden · Ctrl-b ",
+            " Ctrl-M page metadata ",
             Theme::statusbar().fg(theme::FAINT),
         ));
     }
-    // Quiet on the right: no engine trivia, no WAL sizes, no snapshot nag. The
-    // one thing worth a chip is a pane the user hid, so it is not a mystery.
-    let mut right_spans: Vec<Span> = Vec::new();
-    if !app.show_refs {
-        right_spans.push(Span::styled(
-            " references hidden · Ctrl-b ",
-            Theme::statusbar().fg(theme::FAINT),
-        ));
-    }
-    let right = Line::from(right_spans);
+    // Quiet on the right, and not a second copy of the hint bar: the hints
+    // already advertise whatever is relevant, including Ctrl-M.
+    let right = Line::from(Vec::<Span>::new());
 
     let halves = Layout::horizontal([Constraint::Min(40), Constraint::Length(40)]).split(area);
     f.render_widget(Paragraph::new(left).style(Theme::statusbar()), halves[0]);
@@ -1663,8 +1721,8 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                         (":".into(), "commands".into()),
                         ("?".into(), "all keys".into()),
                     ]);
-                    if !app.show_refs {
-                        v.insert(0, ("Ctrl-b".into(), "show references".into()));
+                    if !app.show_meta {
+                        v.insert(0, ("Ctrl-M".into(), "page metadata".into()));
                     }
                     v
                 }

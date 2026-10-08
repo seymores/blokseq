@@ -1048,6 +1048,79 @@ impl Db {
         self.update_content(id, content);
     }
 
+    /// Everything the metadata panel shows about a page, in one round trip.
+    pub fn page_meta(&self, page_id: i64) -> Option<PageMeta> {
+        let (name, kind, created_at, updated_at): (String, String, String, String) = self
+            .conn
+            .query_row(
+                "SELECT name, kind, created_at, updated_at FROM pages WHERE id = ?1",
+                params![page_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()
+            .ok()
+            .flatten()?;
+        let blocks: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM blocks WHERE page_id = ?1 AND deleted_at IS NULL",
+                params![page_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let refs_in: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM refs r WHERE r.page_id = ?1
+                    OR r.target_block IN (SELECT id FROM blocks WHERE page_id = ?1)",
+                params![page_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let refs_out: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM refs r
+                   JOIN blocks b ON b.id = r.from_block
+                  WHERE b.page_id = ?1",
+                params![page_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        // Properties written anywhere on the page (`key:: value` blocks), first
+        // occurrence winning, which is how Logseq treats page properties.
+        let mut properties: Vec<(String, String)> = Vec::new();
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT pr.key, pr.value FROM properties pr
+                   JOIN blocks b ON b.id = pr.block_id
+                  WHERE b.page_id = ?1 AND b.deleted_at IS NULL
+                    AND b.parent_id IS NULL  -- page properties live on a top-level block
+                  ORDER BY b.position, pr.key",
+            )
+            .ok()?;
+        if let Ok(rows) = stmt.query_map(params![page_id], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        }) {
+            for (k, v) in rows.filter_map(|r| r.ok()) {
+                if !properties.iter().any(|(ek, _)| *ek == k) {
+                    properties.push((k, v));
+                }
+            }
+        }
+        Some(PageMeta {
+            name,
+            is_journal: kind == "journal",
+            created_at,
+            updated_at,
+            blocks,
+            refs_in,
+            refs_out,
+            properties,
+        })
+    }
+
     /// Which page a block lives on. Needed to follow a `((block ref))` to the
     /// right page, which may be a journal day.
     pub fn page_of_block(&self, block_id: i64) -> Option<Page> {
@@ -1231,6 +1304,21 @@ impl Db {
             })
             .collect()
     }
+}
+
+/// What the metadata panel knows about a page: identity, timestamps, counts and
+/// properties. The linked references follow it in the same panel -- one place to
+/// look when the question is "what *is* this page".
+#[derive(Clone, Debug)]
+pub struct PageMeta {
+    pub name: String,
+    pub is_journal: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    pub blocks: i64,
+    pub refs_in: i64,
+    pub refs_out: i64,
+    pub properties: Vec<(String, String)>,
 }
 
 /// One row of the Find list: which page, why it matched, and where to land.

@@ -337,26 +337,28 @@ impl App {
 
     // -------------------------------------------------------------- panels
 
-    pub fn toggle_refs(&mut self) {
-        self.show_refs = !self.show_refs;
+    /// `Ctrl-M` -- show or hide the page metadata panel (metadata, linked and
+    /// unlinked references). Hidden by default, so this is the way in.
+    pub fn toggle_meta(&mut self) {
+        self.show_meta = !self.show_meta;
         self.db
-            .set_setting("show_refs", if self.show_refs { "true" } else { "false" });
-        if !self.show_refs && self.focus == Focus::Right {
+            .set_setting("show_meta", if self.show_meta { "true" } else { "false" });
+        if !self.show_meta && self.focus == Focus::Right {
             self.focus = Focus::Main;
         }
         self.toast(
             ToastKind::Info,
-            if self.show_refs {
-                "linked references shown"
+            if self.show_meta {
+                "page metadata shown"
             } else {
-                "linked references hidden"
+                "page metadata hidden"
             },
-            Some("Ctrl-b toggles · :set refs / norefs"),
+            Some("Ctrl-M toggles · :set meta / nometa"),
         );
     }
 
     pub fn focus_right(&mut self) {
-        self.focus = if self.focus == Focus::Main && self.show_refs {
+        self.focus = if self.focus == Focus::Main && self.show_meta {
             Focus::Right
         } else {
             Focus::Main
@@ -365,7 +367,7 @@ impl App {
 
     pub fn focus_cycle(&mut self) {
         self.focus = match self.focus {
-            Focus::Main if self.show_refs => Focus::Right,
+            Focus::Main if self.show_meta => Focus::Right,
             _ => Focus::Main,
         };
     }
@@ -746,12 +748,12 @@ impl App {
             }
             "set" => {
                 match arg.as_str() {
-                    "refs" if !self.show_refs => self.toggle_refs(),
-                    "norefs" if self.show_refs => self.toggle_refs(),
-                    "refs" | "norefs" => {
+                    "meta" if !self.show_meta => self.toggle_meta(),
+                    "nometa" if self.show_meta => self.toggle_meta(),
+                    "meta" | "nometa" => {
                         self.toast(ToastKind::Info, "already set that way", None)
                     }
-                    _ => self.toast(ToastKind::Warn, "set: refs · norefs", None),
+                    _ => self.toast(ToastKind::Warn, "set: meta · nometa", None),
                 }
                 true
             }
@@ -1192,7 +1194,7 @@ impl App {
             "G" => self.jump(true),
             "C-d" => self.move_selection(12),
             "C-u" => self.move_selection(-12),
-            "C-b" => self.toggle_refs(),
+            "C-m" => self.toggle_meta(),
             // Ctrl-P is the navigation: "Find" is everything the sidebar and
             // the page tree used to be, minus the pane you had to find first.
             "C-p" => self.open_palette(),
@@ -1566,12 +1568,20 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_w_l_reaches_the_references_pane() {
+    fn ctrl_w_l_reaches_the_metadata_panel_once_it_is_shown() {
         let mut a = app("refs_focus");
-        assert!(a.show_refs);
+        assert!(!a.show_meta, "hidden by default");
         ctrl(&mut a, 'w');
         key(&mut a, 'l');
-        assert_eq!(a.focus, Focus::Right, "Ctrl-w l focuses the references");
+        assert_eq!(
+            a.focus,
+            Focus::Main,
+            "there is no panel to focus while it is hidden"
+        );
+        ctrl(&mut a, 'm');
+        ctrl(&mut a, 'w');
+        key(&mut a, 'l');
+        assert_eq!(a.focus, Focus::Right, "Ctrl-w l focuses the metadata panel");
         code(&mut a, KeyCode::Esc);
         assert_eq!(a.focus, Focus::Main, "Esc goes back to the blocks");
     }
@@ -1619,12 +1629,26 @@ mod tests {
     }
 
     #[test]
-    fn refs_toggle_and_persist() {
+    fn metadata_is_hidden_by_default_and_ctrl_m_shows_it() {
         let mut a = app("panels");
-        assert!(a.show_refs);
-        ctrl(&mut a, 'b');
-        assert!(!a.show_refs);
-        assert_eq!(a.db.get_setting("show_refs").as_deref(), Some("false"));
+        assert!(!a.show_meta, "the panel starts hidden");
+        ctrl(&mut a, 'm');
+        assert!(a.show_meta, "Ctrl-M shows the page metadata");
+        assert_eq!(a.db.get_setting("show_meta").as_deref(), Some("true"));
+        ctrl(&mut a, 'm');
+        assert!(!a.show_meta);
+        assert_eq!(a.db.get_setting("show_meta").as_deref(), Some("false"));
+    }
+
+    #[test]
+    fn page_metadata_has_the_facts_the_panel_claims() {
+        let a = app("page_meta");
+        let id = a.view_meta_id().expect("a page is open");
+        let m = a.db.page_meta(id).expect("metadata exists");
+        assert_eq!(m.name, "Test Page");
+        assert!(!m.is_journal);
+        assert_eq!(m.blocks, 2);
+        assert!(!m.created_at.is_empty() && !m.updated_at.is_empty());
     }
 
     #[test]

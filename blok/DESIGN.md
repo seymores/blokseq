@@ -65,7 +65,7 @@ rather than hiding it.
 | 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.5). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
-| 8 | **One panel, one toggle, and no page tree** | The references pane hides on `Ctrl-b` or `:set norefs` and persists in `settings`. The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. |
+| 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `Ctrl-M` (or `:set meta`) and persists; the outline is the whole window until then. |
 | 9 | **The engine stays off the screen until it is needed** | No WAL sizes, no engine badges, no snapshot chips in the corners. Schema and journal inspection live behind `:sql`, a read-only console (§6.6). |
 | 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. |
 | 11 | **Messages are messages, not windows** | The last action prints on one line above the status bar and any keypress clears it. No floating boxes: a dialog in the corner of an outliner is a riddle, not a feature. |
@@ -286,23 +286,26 @@ and one status line.
   in purple *resolved to a snippet of the target*, `#tags` in green, `key:: value`
   cyan keys, `TODO`/`DOING`/`DONE` badges, `` `code` `` on a raised background,
   `**bold**`, and `↗N` on any block that contains links.
-* **Right (LINKED REFERENCES):** backlinks grouped by source page (journals by
-  relative date), plus an **unlinked references** section — plain-text mentions of
-  the page title that are not yet linked, which is one of Logseq's best
-  affordances and costs one query. Toggle with `Ctrl-b`.
+* **Right (`Ctrl-M`, hidden by default) — PAGE METADATA:** what the page *is*
+  (kind, created/updated, block count, links in/out, and any `key:: value`
+  properties on a top-level block), then the linked references grouped by source
+  page, then unlinked mentions of the title that are not yet linked. Asking for
+  the panel and the panel being useful are the same gesture.
 * **Bottom:** mode chip, caret state, pending operator, and the cursor's position
   in the outline (`5/12`), then the contextual hint bar.
 
 ### 6.2 Page view and links
 
-| Page | References focused |
+| Page | Page metadata (`Ctrl-M`) |
 |---|---|
-| ![Page](dumps/png/11-page-view.png) | ![Refs](dumps/png/12-linked-references.png) |
+| ![Page](dumps/png/11-page-view.png) | ![Metadata](dumps/png/12-linked-references.png) |
 
-The same outliner, titled with the page name. `Ctrl-w l` focuses the references
-pane; the focused pane's border and section title change colour, and the selected
-reference gets a `▸` marker (selection is never carried by colour alone — it has
-to survive a monochrome terminal).
+The same outliner, titled with the page name. The metadata panel shows the page's
+facts above its backlinks — here `kind page`, `12 blocks`, `2 in · 2 out`, and the
+`owner::`/`review::`/`status::` properties it inherits from a top-level block.
+`Ctrl-w l` focuses it once it is visible; the focused pane's border and section
+title change colour, and the selected reference gets a `▸` marker (selection is
+never carried by colour alone — it has to survive a monochrome terminal).
 
 ### 6.3 Slash commands, page links, block refs
 
@@ -379,10 +382,11 @@ missing, a snapshot did not upload, or the schema is not what you think.
 
 ![SQL console: .tables](dumps/png/25-sql-tables.png)
 
-**Hidden references.** `Ctrl-b`, or `:set norefs`, persisted in `settings`. The
-status bar says so, so a missing pane is never a mystery.
+**Page metadata** (`Ctrl-M`) is off by default and the status bar advertises it
+(`Ctrl-M page metadata`), so a hidden panel is an invitation rather than a
+mystery. It persists in `settings`, and `:set nometa` turns it off.
 
-![References hidden](dumps/png/26-refs-hidden.png)
+![Page metadata on a journal](dumps/png/26-page-metadata.png)
 
 **Find** (`Ctrl-P`) is the navigation. With no query it lists what you touched
 last — journals by relative date, pages by recency, each with its most recent
@@ -563,7 +567,7 @@ vim's grammar is made visible rather than assumed.
 | `gg` `G` `Ctrl-d` `Ctrl-u` | first · last · half page down · half page up |
 | `[` `]` | previous / next journal day |
 | `Ctrl-P` | **open any page**: page/journal picker, filter as you type |
-| `Ctrl-w h` `Ctrl-w l` `Ctrl-w w` | focus the pages panel · references · cycle |
+| `Ctrl-w l` | focus the metadata panel (once shown) |
 | `Ctrl-]` or `gf` | follow the link on this block (menu when there are several) |
 | `Ctrl-o` `Ctrl-i` | jump back / forward (vim's jumplist) |
 | `Enter` (references pane) | open the block that references this page |
@@ -581,7 +585,7 @@ vim's grammar is made visible rather than assumed.
 | `>` `<` `d` `y` `J` `K` | indent, delete, yank, reorder the selection (VISUAL) |
 | `:` | ex command line, Tab-completed |
 | `/` `n` `N` | search the graph · next · previous match |
-| `Ctrl-b` | show / hide the linked references |
+| `Ctrl-M` | show / hide page metadata (facts, links, mentions) |
 | `Ctrl-S` | snapshot, then the storage screen |
 | `q` `ZZ` `ZQ` `:q` | quit · snapshot-and-quit · quit without pruning · quit |
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
@@ -594,7 +598,7 @@ vim's grammar is made visible rather than assumed.
   a line, because moving down a line is already `j` (a line is a block).
 * `J` joins a block with the block below, which is vim's `J` with blocks as lines.
 * `?` opens the keymap instead of searching backwards; `/` + `N` covers that.
-* Page-level things that vim does not have (`[`/`]`, `Ctrl-b`, `Ctrl-P`, the
+* Page-level things that vim does not have (`[`/`]`, `Ctrl-M`, `Ctrl-P`, the
   views) are bound to keys vim leaves alone, and everything else is a `:` command
   rather than a new letter.
 
@@ -689,13 +693,14 @@ Being explicit about this matters more than the demo looking good.
   outdent, reorder, soft delete, fold, undo of the last three of those.
 * `VACUUM INTO` snapshots while the database is open, `backup_log` history, the
   integrity check, and `wal_checkpoint` before measuring.
-* The key router is covered by 16 regression tests (`cargo test`), one per bug
+* The key router is covered by 18 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
   links; `Ctrl-P` opens Find, searches block text, and lands on the matching
-  block; the references toggle persists; a message clears on the next keypress;
-  the console refuses a `DELETE`.
+  block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
+  persists; a message clears on the next keypress; the console refuses a
+  `DELETE`.
 * All 29 frames in this document are the app's own renderer.
 
 **Mocked or stubbed (and flagged as such):**

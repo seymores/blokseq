@@ -5,15 +5,15 @@
 │ table              rows                                                                                                                  │
 │──────────────────────────                                                                                                                │
 │ backup_log         6                                                                                                                     │
-│ blocks             37                                                                                                                    │
-│ blocks_fts         37                                                                                                                    │
+│ blocks             38                                                                                                                    │
+│ blocks_fts         38                                                                                                                    │
 │ blocks_fts_config  1                                                                                                                     │
-│ blocks_fts_data    17                                                                                                                    │
-│ blocks_fts_docsize 37                                                                                                                    │
-│ blocks_fts_idx     15                                                                                                                    │
+│ blocks_fts_data    6                                                                                                                     │
+│ blocks_fts_docsize 38                                                                                                                    │
+│ blocks_fts_idx     4                                                                                                                     │
 │ meta               0                                                                                                                     │
 │ pages              12                                                                                                                    │
-│ properties         2                                                                                                                     │
+│ properties         5                                                                                                                     │
 │ refs               11                                                                                                                    │
 │ settings           3                                                                                                                     │
 │                                                                                                                                          │
