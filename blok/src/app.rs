@@ -22,6 +22,21 @@ pub enum View {
     Sql,
 }
 
+/// What to call a view in one line -- the same identity the pane title uses.
+/// Back and forward have to be able to name where they landed; "went back" is
+/// not an answer to "where am I now".
+pub fn view_label(view: &View) -> String {
+    match view {
+        View::Journal(day) => day.key().to_string(),
+        View::Page(name) => name.clone(),
+        View::Search => "search".into(),
+        View::Query => "the TODO board".into(),
+        View::Backup => "storage".into(),
+        View::Help => "the keymap".into(),
+        View::Sql => "the SQL console".into(),
+    }
+}
+
 /// Vim's `:` command line. One line at the bottom of the screen, with the
 /// matching command names offered as you type.
 #[derive(Clone, Debug, Default)]
@@ -183,9 +198,13 @@ pub struct App {
     pub link_menu: Vec<LinkTarget>,
     /// `:q!` skips the prune pass on the way out.
     pub prune_on_quit: bool,
-    pub visual: Option<usize>,    /// Jump list: `Ctrl-]` pushes, `Ctrl-o` / `Ctrl-i` walk it.
+    pub visual: Option<usize>,
+    /// The pages you have opened and left, oldest first: where `[` / `Ctrl-o`
+    /// goes back to. The page you are on is deliberately *not* in here.
     pub history: Vec<(View, Option<i64>)>,
-    pub history_pos: usize,
+    /// Where `]` / `Ctrl-i` goes forward to. Any new navigation clears it, which
+    /// is what makes this a history rather than a shuffle.
+    pub history_forward: Vec<(View, Option<i64>)>,
     pub undo: Vec<UndoOp>,
     pub redo: Vec<UndoOp>,
 
@@ -257,7 +276,7 @@ impl App {
             prune_on_quit: true,
             visual: None,
             history: Vec::new(),
-            history_pos: 0,
+            history_forward: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
             show_meta,
@@ -424,11 +443,15 @@ impl App {
             View::Journal(day) => day.date + chrono::Duration::days(days),
             _ => self.today + chrono::Duration::days(days),
         };
+        // Stepping to a day is opening a page, so it joins the history and `[`
+        // comes back from it. (The old hint here said `← / →`, which have been
+        // `h`/`l` -- parent and first child -- for several revisions.)
+        self.push_history();
         self.goto_journal(JournalDay::new(d));
         self.toast(
             ToastKind::Info,
             &JournalDay::new(d).title(),
-            Some("journal navigation · ← / →"),
+            Some(":prev · :next · :e -1"),
         );
     }
 
@@ -1422,6 +1445,14 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
 ];
 
 /// Static keymap: single source of truth for `?` and the hint bar.
+/// Where the help screen's second column starts. A *named* section, not the
+/// boundary nearest the middle: "balanced" is not a fact about the content, and
+/// the column headings are. When the split was computed, deleting a duplicated
+/// keymap row moved it and left the second column headed "LINKS & PERSISTENCE"
+/// while it was in fact showing completion, commands and panels. The headings
+/// are now derived from the sections a column holds, so they cannot rot again.
+pub const HELP_COLUMN_2: &str = "Commands";
+
 pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("Modes", "", ""),
     ("Esc", "one press always stops editing; a second drops the caret", "Any"),
@@ -1433,11 +1464,8 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("j k h l", "next · previous · parent · first child", "Normal"),
     ("gg G", "first · last block", "Normal"),
     ("Ctrl-d / Ctrl-u", "half page down / up", "Normal"),
-    ("[ / ]", "previous / next journal day", "Normal"),
-    ("Ctrl-w l", "focus the metadata panel (once shown)", "Normal"),
     ("Following links", "", ""),
     ("Ctrl-]", "follow the link here (menu when there are several)", "Normal"),
-    ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
     ("Enter in refs", "open the block that references this page", "Normal"),
     ("Operators", "", ""),
     ("dd / x", "delete block, subtree included", "Normal"),
@@ -1461,9 +1489,10 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("/ n N", "search the graph · next · previous", "Normal"),
     ("?", "this keymap", "Any"),
     ("Navigation", "", ""),
-    ("[ / ]", "previous / next journal day", "Normal"),
-    ("Ctrl-w l", "focus the references pane", "Normal"),
-    ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
+    ("[ / ]", "back / forward through the pages you have opened", "Normal"),
+    ("Ctrl-o / Ctrl-i", "the same two motions, from vim's jumplist", "Normal"),
+    ("Ctrl-w l", "focus the metadata panel (once shown)", "Normal"),
+    (":prev / :next", "previous / next journal day", "Ex"),
     ("Panels and troubleshooting", "", ""),
     ("Ctrl-M · gm", "show / hide page metadata (facts, refs, mentions)", "Any"),
     (":set meta | nometa", "the same, spelled out, and persisted", "Ex"),
@@ -1493,5 +1522,7 @@ pub const EX_COMMANDS: &[(&str, &str)] = &[
     ("sql", "read-only SQL console; `.tables`, `.schema blocks`"),
     ("search ", "full-text search: `:search snapshot`"),
     ("m ", "move the block: `:m +1`, `:m -2`"),
+    ("prev", "previous journal day (`:next` goes the other way)"),
+    ("next", "next journal day"),
     ("help", "the keymap"),
 ];

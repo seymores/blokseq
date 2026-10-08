@@ -67,7 +67,7 @@ rather than hiding it.
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
 | 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `Ctrl-M` (or `:set meta`) and persists; the outline is the whole window until then. |
 | 9 | **The engine stays off the screen until it is needed** | No WAL sizes, no engine badges, no snapshot chips in the corners. Schema and journal inspection live behind `:sql`, a read-only console (§6.6). |
-| 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. |
+| 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. It measures itself too: when the row is too narrow the tail is dropped, except the last pair, which is pinned to the right edge because the last pair is always `?` — hiding the way to the manual is the one thing a truncated hint bar must not do. |
 | 11 | **Messages are messages, not windows** | The last action prints on one line above the status bar and any keypress clears it. No floating boxes: a dialog in the corner of an outliner is a riddle, not a feature. |
 
 ---
@@ -353,8 +353,21 @@ traversable — the single worst omission in the first version, and it took two
 passes to actually fix. Following one is now discoverable three ways over: the
 block is marked `↗N` in the outline, the hint bar for that block leads with
 "Ctrl-] follow N links", and `Ctrl-]`/`gf` opens the chooser when a block holds
-several. `Ctrl-o` / `Ctrl-i` walk the jumplist, which is vim's tag-stack
-behaviour. A page that does not exist yet reads `new page` rather than failing.
+several. `[` / `]` (and `Ctrl-o` / `Ctrl-i`, which are the same two motions)
+walk that history back and forward. A page that does not exist yet reads
+`new page` rather than failing.
+
+**Back and forward are the pages you opened, not the calendar.** `[`/`]` used to
+step to the previous/next journal day, which made them useless for the thing a
+pair of bracket keys is for -- returning to the page you just came from -- and
+meant `]` walked you off today's journal on a stray keystroke. They are now the
+two-stack browser model: `history` behind you, `history_forward` ahead, both
+holding the view *and* the block you were on, so going back lands where you left
+rather than at the top of the page. Opening a page clears whatever was ahead of
+you, as a browser does. Days moved to `:prev` / `:next`, which are explicit
+enough that stepping the calendar is a decision rather than a slip. This also
+fixed the jumplist underneath: a single stack with a cursor that could not undo
+one jump at all, and with two jumps skipped the page in between (`the_jumplist_walks_every_page_it_recorded`).
 
 ![Link chooser](dumps/png/21-follow-link-menu.png)
 
@@ -612,11 +625,12 @@ vim's grammar is made visible rather than assumed.
 | `Enter` | put the caret *in* the block's text (still NORMAL) |
 | `j` `k` `h` `l` | next · previous · parent · first child block |
 | `gg` `G` `Ctrl-d` `Ctrl-u` | first · last · half page down · half page up |
-| `[` `]` | previous / next journal day |
+| `[` `]` | **back / forward**: the pages you have opened (`Ctrl-o`/`Ctrl-i` too) |
+| `:prev` `:next` | previous / next journal day, deliberately not on a single key |
 | `Ctrl-P` | **open any page**: page/journal picker, filter as you type |
 | `Ctrl-w l` | focus the metadata panel (once shown) |
 | `Ctrl-]` or `gf` | follow the link on this block (menu when there are several) |
-| `Ctrl-o` `Ctrl-i` | jump back / forward (vim's jumplist) |
+| `Ctrl-o` `Ctrl-i` | the same two motions as `[`/`]`, from vim's jumplist |
 | `Enter` (references pane) | open the block that references this page |
 | `dd` `x` | delete the block, subtree included |
 | `yy` `Y` | yank the block into the register |
@@ -766,7 +780,23 @@ Being explicit about this matters more than the demo looking good.
   `the_cursor_follows_the_focus` for the editor left open behind the panel;
   `the_caret_shows_in_a_provisional_journal` covers the ghost first block, which
   is a separate render path.
-* The key router is covered by 31 regression tests (`cargo test`), one per bug
+* Navigation history has its own tests, because its two bugs were invisible:
+  `brackets_walk_back_and_forward_through_opened_pages`,
+  `brackets_do_not_step_the_journal_day` (the report),
+  `the_jumplist_walks_every_page_it_recorded` (the off-by-one that skipped a
+  page), and `a_new_page_drops_the_forward_trail`.
+* The help screen's two columns are split at a *named* section and headed with
+  the sections they actually hold (`the_help_columns_are_headed_by_what_they_hold`).
+  They used to be a computed midpoint under hardcoded titles, which meant that
+  deleting one duplicated keymap row was enough to leave the second column
+  headed "LINKS & PERSISTENCE" while it showed completion, commands and panels.
+* The hint bar has a test of its own: `the_hint_bar_keeps_the_way_to_the_manual`
+  renders at 60, 80 and 140 columns and insists `? all keys` survives all three,
+  and that `[ ] back / forward` is on screen where there is room for it. The bar
+  had grown to 204 cells in a 140-cell row, so the two most useful things on it
+  -- the new bracket keys and the pointer to the manual -- were exactly the two
+  that got cut.
+* The key router is covered by 37 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -774,7 +804,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 29 frames in this document are the app's own renderer (29 frames, 31
+* All 29 frames in this document are the app's own renderer (29 frames, 37
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

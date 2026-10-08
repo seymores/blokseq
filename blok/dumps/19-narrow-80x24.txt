@@ -21,4 +21,4 @@
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  NORMAL    3/12  depth 1
- Ctrl-M page metadata   j/k blocks   ⏎ / i edit this block   o new block   h/l p
+ Ctrl-M metadata   j/k blocks   ⏎ / i edit   o new block            ? all keys

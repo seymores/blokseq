@@ -569,36 +569,66 @@ impl App {
         self.focus = Focus::Main;
     }
 
-    // ------------------------------------------------------------ jumplist
+    // ------------------------------------------------------------- history
 
+    /// Where you are, as a history entry: the view plus the block that was
+    /// selected, so going back lands where you left rather than on the page's
+    /// first block.
+    fn here(&self) -> (View, Option<i64>) {
+        (self.view.clone(), self.selected_row().map(|r| r.id))
+    }
+
+    /// Called immediately *before* navigating away. This is the two-stack
+    /// browser model -- `history` is what is behind you, `history_forward` what
+    /// is ahead -- and it replaced a single stack with a cursor that was wrong
+    /// in two ways: a single jump could not be undone at all (`history_pos`
+    /// started at the only entry), and with two jumps `Ctrl-o` skipped the page
+    /// in between. Both bugs were reachable, neither had a test.
     pub fn push_history(&mut self) {
-        let here = (self.view.clone(), self.selected_row().map(|r| r.id));
-        if self.history.get(self.history_pos) == Some(&here) {
-            return;
+        let here = self.here();
+        if self.history.last() != Some(&here) {
+            self.history.push(here);
         }
-        self.history.truncate(self.history_pos + 1);
-        self.history.push(here);
-        self.history_pos = self.history.len() - 1;
+        // A new page is a new branch: whatever was ahead is now unreachable.
+        self.history_forward.clear();
     }
 
     pub fn history_back(&mut self) {
-        if self.history.is_empty() || self.history_pos == 0 {
-            self.toast(ToastKind::Info, "start of the jump list", None);
+        let Some(prev) = self.history.pop() else {
+            self.toast(
+                ToastKind::Info,
+                "no page to go back to",
+                Some("the history starts at this page"),
+            );
             return;
-        }
-        self.history_pos -= 1;
-        let (view, block) = self.history[self.history_pos].clone();
-        self.go_history(view, block);
+        };
+        self.history_forward.push(self.here());
+        self.go_history(prev.0, prev.1);
+        // Naming the destination is the whole point of back/forward: the pane
+        // title changes, but "where did that put me" deserves an answer.
+        self.toast(
+            ToastKind::Info,
+            &format!("← {}", crate::app::view_label(&self.view)),
+            None,
+        );
     }
 
     pub fn history_forward(&mut self) {
-        if self.history_pos + 1 >= self.history.len() {
-            self.toast(ToastKind::Info, "end of the jump list", None);
+        let Some(next) = self.history_forward.pop() else {
+            self.toast(
+                ToastKind::Info,
+                "no page to go forward to",
+                Some("open a page and it joins the history"),
+            );
             return;
-        }
-        self.history_pos += 1;
-        let (view, block) = self.history[self.history_pos].clone();
-        self.go_history(view, block);
+        };
+        self.history.push(self.here());
+        self.go_history(next.0, next.1);
+        self.toast(
+            ToastKind::Info,
+            &format!("→ {}", crate::app::view_label(&self.view)),
+            None,
+        );
     }
 
     fn go_history(&mut self, view: View, block: Option<i64>) {
@@ -736,14 +766,29 @@ impl App {
                 if arg.is_empty() {
                     self.reload();
                     self.toast(ToastKind::Info, "reloaded from SQLite", None);
-                } else if let Ok(day) = chrono::NaiveDate::parse_from_str(&arg, "%Y-%m-%d") {
-                    self.goto_journal(JournalDay::new(day));
-                } else if let Ok(offset) = arg.parse::<i64>() {
-                    let day = JournalDay::new(self.today + chrono::Duration::days(offset));
-                    self.goto_journal(day);
                 } else {
-                    self.goto_page(&arg);
+                    // A page opened with `:e` is a page you opened, so `[` has
+                    // to be able to come back from it.
+                    self.push_history();
+                    if let Ok(day) = chrono::NaiveDate::parse_from_str(&arg, "%Y-%m-%d") {
+                        self.goto_journal(JournalDay::new(day));
+                    } else if let Ok(offset) = arg.parse::<i64>() {
+                        let day = JournalDay::new(self.today + chrono::Duration::days(offset));
+                        self.goto_journal(day);
+                    } else {
+                        self.goto_page(&arg);
+                    }
                 }
+                true
+            }
+            // Days moved off `[`/`]`: navigation keys are for the pages you have
+            // opened, and stepping the calendar is a deliberate act.
+            "prev" | "previous" => {
+                self.shift_journal(-1);
+                true
+            }
+            "next" => {
+                self.shift_journal(1);
                 true
             }
             "set" => {
@@ -1238,8 +1283,13 @@ impl App {
             "n" => self.search_step(1),
             "N" => self.search_step(-1),
             "?" => self.set_view(View::Help),
-            "[" => self.shift_journal(-1),
-            "]" => self.shift_journal(1),
+            // Back and forward through the pages you have opened -- the same
+            // two motions as `Ctrl-o`/`Ctrl-i`, on the keys a browser taught
+            // everyone. Journal days are *not* on these: `]` used to walk to
+            // tomorrow, which made the pair useless for going back to the page
+            // you just came from. Days are `:prev` / `:next` now.
+            "[" => self.history_back(),
+            "]" => self.history_forward(),
             // `q` quits here rather than recording a macro: macros are not
             // implemented, and a key that does nothing is worse than a small
             // deviation. `ZZ` / `ZQ` are vim's own quit pair.
@@ -1692,5 +1742,130 @@ mod tests {
             }
             assert!(a.quit, "`{path}` must quit");
         }
+    }
+
+    /// `[` and `]` are back and forward through the pages you have opened -- the
+    /// same two motions as `Ctrl-o`/`Ctrl-i`, on the keys a browser taught
+    /// everyone -- and they name where they landed.
+    #[test]
+    fn brackets_walk_back_and_forward_through_opened_pages() {
+        let mut a = app("brackets_history");
+        let other = a.db.ensure_page("Other Page", PageKind::Page);
+        a.db.create_block(other.id, None, None, "elsewhere");
+
+        a.run_ex("e Other Page");
+        assert_eq!(a.view, View::Page("Other Page".into()));
+
+        key(&mut a, '[');
+        assert_eq!(
+            a.view,
+            View::Page("Test Page".into()),
+            "`[` returns to the page you came from"
+        );
+        assert!(
+            a.toast.as_ref().is_some_and(|t| t.text.contains("Test Page")),
+            "going back names the page it landed on"
+        );
+
+        key(&mut a, ']');
+        assert_eq!(a.view, View::Page("Other Page".into()));
+        assert!(
+            a.toast.as_ref().is_some_and(|t| t.text.contains("Other Page")),
+            "and so does going forward"
+        );
+
+        // The end of the history is an answer, not a silent no-op.
+        key(&mut a, ']');
+        assert_eq!(a.view, View::Page("Other Page".into()), "nothing newer");
+        assert!(
+            a.toast.as_ref().is_some_and(|t| t.text.contains("no page to go forward")),
+            "and it says so"
+        );
+    }
+
+    /// The report: `]` walked to tomorrow's journal. Journal days are a
+    /// deliberate step now (`:prev` / `:next`), never a default for the
+    /// navigation keys.
+    #[test]
+    fn brackets_do_not_step_the_journal_day() {
+        let mut a = app("brackets_days");
+        a.goto_journal(JournalDay::new(a.today));
+        let today = JournalDay::new(a.today);
+
+        key(&mut a, ']');
+        assert_eq!(a.view, View::Journal(today), "`]` must not walk to tomorrow");
+        key(&mut a, '[');
+        assert_eq!(a.view, View::Journal(today), "nor `[` back to yesterday");
+
+        a.run_ex("next");
+        let tomorrow = JournalDay::new(a.today + chrono::Duration::days(1));
+        assert_eq!(a.view, View::Journal(tomorrow), "`:next` still steps a day");
+        a.run_ex("prev");
+        assert_eq!(a.view, View::Journal(today), "and `:prev` steps back");
+
+        // Stepping is opening a page, so the page you left is still behind you.
+        a.run_ex("next");
+        key(&mut a, '[');
+        assert_eq!(a.view, View::Journal(today));
+    }
+
+    /// The jumplist skipped the page in the middle. `history_pos` sat on the only
+    /// recorded entry, so a single jump could not be undone at all and the second
+    /// `Ctrl-o` went back two pages. Reachable, untested, and the reason `[` and
+    /// `]` needed the same machinery to be worth anything.
+    #[test]
+    fn the_jumplist_walks_every_page_it_recorded() {
+        let mut a = app("history_chain");
+        for name in ["One", "Two", "Three"] {
+            let p = a.db.ensure_page(name, PageKind::Page);
+            a.db.create_block(p.id, None, None, name);
+        }
+        a.run_ex("e One");
+        a.run_ex("e Two");
+        a.run_ex("e Three");
+        assert_eq!(a.view, View::Page("Three".into()));
+
+        ctrl(&mut a, 'o');
+        assert_eq!(a.view, View::Page("Two".into()), "one step back, not two");
+        ctrl(&mut a, 'o');
+        assert_eq!(a.view, View::Page("One".into()));
+        ctrl(&mut a, 'o');
+        assert_eq!(
+            a.view,
+            View::Page("Test Page".into()),
+            "and then the page we started on"
+        );
+
+        ctrl(&mut a, 'i');
+        assert_eq!(a.view, View::Page("One".into()), "forward retraces the chain");
+    }
+
+    /// Going back and then somewhere else is a new branch: what was ahead is
+    /// dropped, as in a browser. Without this, `]` would walk into a trail that
+    /// no longer connects to where you are.
+    #[test]
+    fn a_new_page_drops_the_forward_trail() {
+        let mut a = app("history_branch");
+        for name in ["Other Page", "Another"] {
+            let p = a.db.ensure_page(name, PageKind::Page);
+            a.db.create_block(p.id, None, None, name);
+        }
+        a.run_ex("e Other Page");
+        key(&mut a, '[');
+        assert_eq!(a.view, View::Page("Test Page".into()));
+
+        a.run_ex("e Another");
+        key(&mut a, ']');
+        assert_eq!(
+            a.view,
+            View::Page("Another".into()),
+            "`]` must not resurrect a page from the abandoned trail"
+        );
+        assert!(
+            a.toast
+                .as_ref()
+                .is_some_and(|t| t.text.contains("no page to go forward")),
+            "and it says there is nothing ahead"
+        );
     }
 }

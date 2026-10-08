@@ -1595,27 +1595,41 @@ fn render_backup(f: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
+/// The row the second help column starts at: the section named in
+/// `HELP_COLUMN_2`. See the comment on that constant for why this is not a
+/// computed midpoint.
+pub fn help_split() -> usize {
+    KEYMAP
+        .iter()
+        .position(|(k, d, _)| d.is_empty() && *k == crate::app::HELP_COLUMN_2)
+        .unwrap_or(KEYMAP.len() / 2)
+        .max(1)
+}
+
+/// A column heading that cannot lie: the section names the column actually
+/// begins and ends with.
+fn column_title(slice: &[(&str, &str, &str)]) -> String {
+    let names: Vec<&str> = slice
+        .iter()
+        .filter(|(_, d, _)| d.is_empty())
+        .map(|(k, _, _)| *k)
+        .collect();
+    match (names.first(), names.last()) {
+        (Some(a), Some(b)) if a != b => {
+            format!("KEYMAP · {} → {}", a.to_uppercase(), b.to_uppercase())
+        }
+        (Some(a), _) => format!("KEYMAP · {}", a.to_uppercase()),
+        _ => "KEYMAP".to_string(),
+    }
+}
+
 fn render_help(f: &mut Frame, app: &App, area: Rect) {
     let _ = app;
     let cols = Layout::horizontal([Constraint::Percentage(52), Constraint::Percentage(48)]).split(area);
-    // Split at a section boundary near the middle, so the columns are balanced
-    // and no group is orphaned the way a naive half-split leaves them.
-    let half = KEYMAP.len() / 2;
-    let split = KEYMAP
-        .iter()
-        .enumerate()
-        .filter(|(_, (_, d, _))| d.is_empty())
-        .map(|(i, _)| i)
-        .min_by_key(|i| (*i as i64 - half as i64).abs())
-        .unwrap_or(half)
-        .max(1);
+    let split = help_split();
     for (i, slice) in [&KEYMAP[..split], &KEYMAP[split..]].iter().enumerate() {
         f.render_widget(
-            panel(
-                if i == 0 { "KEYMAP · NAVIGATION & EDITING" } else { "KEYMAP · LINKS & PERSISTENCE" },
-                i == 0,
-                None,
-            ),
+            panel(&column_title(slice), i == 0, None),
             cols[i],
         );
         let inner = Rect {
@@ -1804,20 +1818,20 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                     }
                     v.extend([
                         ("j/k".into(), "blocks".into()),
-                        ("⏎ / i".into(), "edit this block".into()),
+                        ("⏎ / i".into(), "edit".into()),
                         ("o".into(), "new block".into()),
-                        ("h/l".into(), "parent / children".into()),
+                        ("h/l".into(), "parent · child".into()),
                         ("za".into(), "fold".into()),
-                        ("Ctrl-P".into(), "Find any page".into()),
-                        ("[ ]".into(), "prev / next day".into()),
+                        ("Ctrl-P".into(), "Find".into()),
+                        ("[ ]".into(), "back / forward".into()),
                         ("/".into(), "search".into()),
                         (":".into(), "commands".into()),
                         ("?".into(), "all keys".into()),
                     ]);
                     if !app.show_meta {
-                        v.insert(0, (app.meta_key().into(), "page metadata".into()));
+                        v.insert(0, (app.meta_key().into(), "metadata".into()));
                     } else if app.focus == Focus::Main {
-                        v.push((app.meta_key().into(), "hide metadata".into()));
+                        v.push((app.meta_key().into(), "hide".into()));
                     }
                     v
                 }
@@ -1848,14 +1862,54 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
             },
         },
     };
-    let mut spans: Vec<Span> = Vec::new();
-    for (k, d) in pairs {
-        spans.push(Span::styled(format!(" {} ", k), Theme::key()));
-        spans.push(Span::styled(format!("{}  ", d), Theme::dim().bg(theme::BG)));
+    // The bar measures itself. Most relevant first, so when the row is too
+    // narrow the tail is what goes -- except the last pair, which is pinned to
+    // the right edge. The last pair is always the pointer to `?`, and hiding the
+    // way to the manual is the one thing a truncated hint bar must not do.
+    let width_of = |(k, d): &(String, String)| 1 + k.chars().count() + 1 + d.chars().count() + 2;
+    let pair_spans = |(k, d): &(String, String)| {
+        vec![
+            Span::styled(format!(" {} ", k), Theme::key()),
+            Span::styled(format!("{}  ", d), Theme::dim().bg(theme::BG)),
+        ]
+    };
+    let room = area.width as usize;
+    let wanted: usize = pairs.iter().map(width_of).sum();
+
+    if wanted <= room || pairs.len() < 2 {
+        let spans: Vec<Span> = pairs.iter().flat_map(pair_spans).collect();
+        f.render_widget(
+            Paragraph::new(Line::from(spans)).style(Theme::hintbar()),
+            area,
+        );
+        return;
     }
+
+    let (head, pinned) = pairs.split_at(pairs.len() - 1);
+    let reserve = width_of(&pinned[0]) + 1;
+    let mut spans: Vec<Span> = Vec::new();
+    let mut used = 0usize;
+    for p in head {
+        let w = width_of(p);
+        if used + w > room.saturating_sub(reserve) {
+            break;
+        }
+        used += w;
+        spans.extend(pair_spans(p));
+    }
+    let halves = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(width_of(&pinned[0]) as u16),
+    ])
+    .split(area);
     f.render_widget(
         Paragraph::new(Line::from(spans)).style(Theme::hintbar()),
-        area,
+        halves[0],
+    );
+    let spanned: Vec<Span> = pinned.iter().flat_map(pair_spans).collect();
+    f.render_widget(
+        Paragraph::new(Line::from(spanned)).style(Theme::hintbar()),
+        halves[1],
     );
 }
 
@@ -2142,7 +2196,7 @@ mod render_tests {
     use ratatui::layout::Position;
     use ratatui::Terminal;
 
-    use super::{block_lines, editor_lines};
+    use super::{block_lines, column_title, editor_lines, help_split};
 
     fn app(name: &str) -> App {
         let path =
@@ -2347,6 +2401,74 @@ mod render_tests {
             let rendered = block_lines_longest(&a, &linked, w);
             assert!(rendered <= w, "block line of {rendered} cells at width {w}");
         }
+    }
+
+    /// The hint bar is a manual that keeps wanting to be longer, so it measures
+    /// itself: the tail is dropped when the row is too narrow, except the pinned
+    /// last pair -- the pointer to `?`. Before this, `[ ] back / forward` *and*
+    /// `? all keys` were being truncated away at 140 columns, which is how a
+    /// manual stops being one.
+    #[test]
+    fn the_hint_bar_keeps_the_way_to_the_manual() {
+        fn hint_at(a: &mut App, w: u16) -> String {
+            let term = draw(a, w, 30);
+            (0..w)
+                .map(|x| term.backend().buffer()[(x, 29)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        }
+
+        let mut a = app("hints_width");
+        for w in [60u16, 80, 100] {
+            let hint = hint_at(&mut a, w);
+            assert!(hint.contains("all keys"), "the manual pointer at {w}: {hint}");
+        }
+        // Narrower than the pinned pair itself: it has to clip, not panic.
+        let _ = hint_at(&mut a, 12);
+
+        let wide = hint_at(&mut a, 140);
+        assert!(wide.contains("[ ]"), "{wide}");
+        assert!(wide.contains("back / forward"), "{wide}");
+        assert!(wide.contains("all keys"), "{wide}");
+    }
+
+    /// The help screen's two columns are split at a named section and headed
+    /// with the sections they actually hold. The bug this closes: the headings
+    /// were hardcoded strings while the split was computed as "the boundary
+    /// nearest the middle", so one keymap edit silently left the second column
+    /// headed "LINKS & PERSISTENCE" over completion, commands and panels.
+    #[test]
+    fn the_help_columns_are_headed_by_what_they_hold() {
+        let split = help_split();
+        let right_start = crate::app::KEYMAP[split..]
+            .iter()
+            .find(|(_, d, _)| d.is_empty())
+            .map(|(k, _, _)| *k);
+        assert_eq!(
+            right_start,
+            Some(crate::app::HELP_COLUMN_2),
+            "the second column must begin at the named section"
+        );
+
+        assert_eq!(
+            column_title(&crate::app::KEYMAP[..split]),
+            "KEYMAP · MODES → INLINE COMPLETION"
+        );
+        assert_eq!(
+            column_title(&crate::app::KEYMAP[split..]),
+            "KEYMAP · COMMANDS → VIEWS"
+        );
+        // Nothing may be orphaned on the wrong side of the split.
+        // Section names are title case in the data and uppercased for display.
+        let holds = |slice: &[(&str, &str, &str)], want: &str| {
+            slice
+                .iter()
+                .any(|(k, d, _)| d.is_empty() && k.eq_ignore_ascii_case(want))
+        };
+        assert!(holds(&crate::app::KEYMAP[..split], "MODES"));
+        assert!(!holds(&crate::app::KEYMAP[..split], "VIEWS"));
+        assert!(holds(&crate::app::KEYMAP[split..], "VIEWS"));
     }
 
     /// The provisional day: nothing has been written yet, the outline is empty,

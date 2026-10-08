@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  3 links — pick one   ↑↓ choose · Enter follow · Esc cancel
  NORMAL   12/12
- Ctrl-M page metadata   Ctrl-] follow 3 links   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P
+ Ctrl-M metadata   Ctrl-] follow 3 links   j/k blocks   ⏎ / i edit   o new block   h/l parent · child   za fold                 ? all keys

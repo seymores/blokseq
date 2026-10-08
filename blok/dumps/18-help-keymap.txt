@@ -1,39 +1,39 @@
-╭ KEYMAP · NAVIGATION & EDITING ────────────────────────────────────────╮╭ KEYMAP · LINKS & PERSISTENCE ───────────────────────────────────╮
+╭ KEYMAP · MODES → INLINE COMPLETION ───────────────────────────────────╮╭ KEYMAP · COMMANDS → VIEWS ──────────────────────────────────────╮
 │                                                                       ││                                                                 │
-│  MODES                                                                ││  TEXT MOTIONS                                                   │
-│  Esc                 one press always stops editing; a secon…Any      ││  w b e 0 ^ $         word and line motions inside one block  Tex│
-│  Enter               put the cursor in this block's text     Normal   ││  x dw d$ D           delete char · word · to line end        Tex│
-│  i a I A             insert · append · line start · line end Normal   ││  cw ciw C            change word · to line end               Tex│
-│  o O cc              open a block below · above · change thi…Normal   ││  Ctrl-w / Ctrl-u     delete word / to line start             Ins│
+│  MODES                                                                ││  COMMANDS                                                       │
+│  Esc                 one press always stops editing; a secon…Any      ││  :                   ex command line (Tab completes, :help l…Nor│
+│  Enter               put the cursor in this block's text     Normal   ││  Ctrl-P              Find: recent pages, then a search of na…Any│
+│  i a I A             insert · append · line start · line end Normal   ││  / n N               search the graph · next · previous      Nor│
+│  o O cc              open a block below · above · change thi…Normal   ││  ?                   this keymap                             Any│
 │  v / V               select a block range / a whole subtree  Normal   ││                                                                 │
-│                                                                       ││  INLINE COMPLETION                                              │
-│  BLOCK MOTIONS                                                        ││  /                   slash commands inside a block           Ins│
-│  j k h l             next · previous · parent · first child  Normal   ││  [[ (( #             page link · block ref · tag             Ins│
-│  gg G                first · last block                      Normal   ││                                                                 │
-│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││  COMMANDS                                                       │
-│  [ / ]               previous / next journal day             Normal   ││  :                   ex command line (Tab completes, :help l…Nor│
-│  Ctrl-w l            focus the metadata panel (once shown)   Normal   ││  Ctrl-P              Find: recent pages, then a search of na…Any│
-│                                                                       ││  / n N               search the graph · next · previous      Nor│
-│  FOLLOWING LINKS                                                      ││  ?                   this keymap                             Any│
-│  Ctrl-]              follow the link here (menu when there a…Normal   ││                                                                 │
-│  Ctrl-o / Ctrl-i     jump back / forward                     Normal   ││  NAVIGATION                                                     │
-│  Enter in refs       open the block that references this pageNormal   ││  [ / ]               previous / next journal day             Nor│
-│                                                                       ││  Ctrl-w l            focus the references pane               Nor│
-│  OPERATORS                                                            ││  Ctrl-o / Ctrl-i     jump back / forward                     Nor│
-│  dd / x              delete block, subtree included          Normal   ││                                                                 │
-│  yy / Y              yank block into the register            Normal   ││  PANELS AND TROUBLESHOOTING                                     │
-│  p / P               paste register after / before           Normal   ││  Ctrl-M · gm         show / hide page metadata (facts, refs,…Any│
-│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││  :set meta | nometa  the same, spelled out, and persisted    Ex │
-│  J                   join this block with the one below      Normal   ││  :sql                read-only SQL console, on demand        Ex │
-│  u / Ctrl-r          undo / redo                             Any      ││  :w                  snapshot + queue for the remote         Ex │
-│  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││  Ctrl-S              snapshot, then the storage screen       Any│
-│                                                                       ││  q / :q              quit, pruning unwritten journals first  Nor│
-│                                                                       ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
+│                                                                       ││  NAVIGATION                                                     │
+│  BLOCK MOTIONS                                                        ││  [ / ]               back / forward through the pages you ha…Nor│
+│  j k h l             next · previous · parent · first child  Normal   ││  Ctrl-o / Ctrl-i     the same two motions, from vim's jumpli…Nor│
+│  gg G                first · last block                      Normal   ││  Ctrl-w l            focus the metadata panel (once shown)   Nor│
+│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││  :prev / :next       previous / next journal day             Ex │
 │                                                                       ││                                                                 │
-│                                                                       ││  VIEWS                                                          │
-│                                                                       ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
-│                                                                       ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
+│  FOLLOWING LINKS                                                      ││  PANELS AND TROUBLESHOOTING                                     │
+│  Ctrl-]              follow the link here (menu when there a…Normal   ││  Ctrl-M · gm         show / hide page metadata (facts, refs,…Any│
+│  Enter in refs       open the block that references this pageNormal   ││  :set meta | nometa  the same, spelled out, and persisted    Ex │
+│                                                                       ││  :sql                read-only SQL console, on demand        Ex │
+│  OPERATORS                                                            ││  :w                  snapshot + queue for the remote         Ex │
+│  dd / x              delete block, subtree included          Normal   ││  Ctrl-S              snapshot, then the storage screen       Any│
+│  yy / Y              yank block into the register            Normal   ││  q / :q              quit, pruning unwritten journals first  Nor│
+│  p / P               paste register after / before           Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
+│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││                                                                 │
+│  J                   join this block with the one below      Normal   ││  VIEWS                                                          │
+│  u / Ctrl-r          undo / redo                             Any      ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
+│  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
 │                                                                       ││                                                                 │
+│  TEXT MOTIONS                                                         ││                                                                 │
+│  w b e 0 ^ $         word and line motions inside one block  Text     ││                                                                 │
+│  x dw d$ D           delete char · word · to line end        Text     ││                                                                 │
+│  cw ciw C            change word · to line end               Text     ││                                                                 │
+│  Ctrl-w / Ctrl-u     delete word / to line start             Insert   ││                                                                 │
+│                                                                       ││                                                                 │
+│  INLINE COMPLETION                                                    ││                                                                 │
+│  /                   slash commands inside a block           Insert   ││                                                                 │
+│  [[ (( #             page link · block ref · tag             Insert   ││                                                                 │
 │                                                                       ││                                                                 │
 │                                                                       ││                                                                 │
 │                                                                       ││                                                                 │

@@ -25,7 +25,7 @@ cargo run -- --db ./scratch.db        # use a throwaway database
 cargo run -- --dump dumps             # re-render every mockup frame
 cargo run -- --demo-lifecycle         # print the journal create/prune trace
 cargo run -- --stats                  # row counts, FTS5 availability, integrity
-cargo test                            # 31 regression tests, one per bug
+cargo test                            # 37 regression tests, one per bug
 ```
 
 Dependencies: `ratatui` 0.30, `crossterm` 0.29, `rusqlite` 0.40 (`bundled`, so
@@ -77,7 +77,8 @@ Vim's, with the **block** as the line, in three modes and no more: `NORMAL`,
 a block's text (press `Enter`) and still be in NORMAL, and any tree motion leaves
 it, so the text cursor is a position rather than a fourth mode you can get stuck
 in. `Ctrl-]` or `gf` follows a link (`↗N` marks the blocks that have them),
-`Ctrl-o`/`Ctrl-i` are the jumplist, `dd`/`yy`/`p` operate on whole subtrees,
+`[`/`]` (and `Ctrl-o`/`Ctrl-i`) walk back and forward through the pages you have
+opened, `dd`/`yy`/`p` operate on whole subtrees,
 `u`/`Ctrl-r` undo and redo, and everything app-level is a `:` command (`:e`,
 `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
 are listed in [DESIGN.md §7.5](DESIGN.md).

@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL    5/12  depth 1
- Ctrl-M page metadata   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P Find any page   [ ] prev
+ Ctrl-M metadata   j/k blocks   ⏎ / i edit   o new block   h/l parent · child   za fold   Ctrl-P Find   [ ] back / forward      ? all keys
