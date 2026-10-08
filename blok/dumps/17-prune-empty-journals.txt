@@ -1,42 +1,42 @@
- blok   Storage & backup                                                                       38 blocks · 12 pages · 11 refs  local  09:41
-╭ STORAGE ─────────────────────────────────────────────────────╮╭ SNAPSHOTS → REMOTE ──────────────────────────────────────────────────────╮
-│  database           /Users/ping/Documents/deepseek-harness/de││  remote  dropbox:Apps/blok   rclone copy --checksum                      │
-│  engine             SQLite · WAL · FTS5                      ││  one file in, one file out — no document merge, no conflict soup         │
-│  file size          108.0 KB                                 ││                                                                          │
-│  wal size           0 B                                      ││  WHEN            SIZE      STATE     FILE                                │
-│  integrity          ok                                       ││  00:16:39      1.1 MB   uploaded blok-20261008-001639.sqlite             │
-│                                                              ││  03:16:39      1.1 MB   uploaded blok-20261008-031639.sqlite             │
-│  tables                                                      ││  06:16:39      1.1 MB   uploaded blok-20261008-061639.sqlite             │
-│  pages              12 rows                                  ││  09:16:39      1.1 MB   uploaded blok-20261008-091639.sqlite             │
-│  journals           4 rows                                   ││  12:16:39      1.1 MB   uploaded blok-20261008-121639.sqlite             │
-│  blocks             38 rows                                  ││  15:16:39      1.1 MB   queued   blok-20261008-151639.sqlite             │
-│  refs               11 rows                                  ││                                                                          │
-│  properties         2 rows                                   ││  WHY THIS IS SAFE                                                        │
-│                                                              ││  ▸ VACUUM INTO writes a consistent snapshot while the app keeps running. │
-│  maintenance                                                 ││  ▸ The snapshot is a plain SQLite file: restore = copy it back and open. │
-│  empty blocks       1 (transient)                            ││  ▸ WAL means a crash mid-write replays instead of corrupting.            │
-│  pruned journals    6 removed                                ││  ▸ Syncing a live .db by file copy is not safe; syncing a snapshot is.   │
-│      · 2026-09-29  empty → dropped                           ││  ▸ History is the snapshot list: point-in-time restore without git.      │
-│      · 2026-09-30  empty → dropped                           ││                                                                          │
-│      · 2026-10-01  empty → dropped                           ││                                                                          │
-│      · 2026-10-02  empty → dropped                           ││                                                                          │
-│      · 2026-10-03  empty → dropped                           ││                                                                          │
-│      · 2026-10-04  empty → dropped                           ││                                                                          │
-│                                                              ││                                                                          │
-│  layout                                                      ││                                                                          │
-│  ~/.blok/                                                    ││                                                                          │
-│  ├── blok.db            blocks · pages · refs · FTS5         ││                                                                          │
-│  ├── blok.db-wal        crash safety, checkpointed on quit   ││                                                                          │
-│  ├── snapshots/         VACUUM INTO single-file copies       ││                                                                          │
-│  └── snapshots/queue/   upload descriptors for the remote    ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-│                                                              ││                                                                          │
-╰──────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
  !  pruned 6 empty journal pages   a journal only exists once it has content
- NORMAL  blocks  ·  ok · 108.0 KB  ·  block #21                                                                       no snapshot yet — :w
+ NORMAL  ok · 108.0 KB
  Ctrl-S snapshot   :sql console   Esc back

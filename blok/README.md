@@ -60,14 +60,15 @@ tools/         render_png.py — ANSI frame -> PNG screenshot
 | 09 | `09a/09b-merge` | empty block, then Backspace at its start |
 | 10 | `10-visual-multiselect` | visual range + structural verbs |
 | 11-12 | `11-page-view`, `12-linked-references` | page view, backlinks focus |
-| 13-15 | `13-command-palette`, `14-search-fts`, `15-todo-board` | palette, search, board |
+| 13-15 | `13-find-search`, `14-search-fts`, `15-todo-board` | Find, search, board |
 | 16-17 | `16-backup-remote`, `17-prune-empty-journals` | snapshots + prune report |
 | 18-20 | `18-help-keymap`, `19-narrow-80x24`, `20-new-block-hint` | keymap, compact layout |
 | 21 | `21-follow-link-menu` | `Ctrl-]` following a link, with a chooser when there are several |
 | 22 | `22-text-normal-vim` | TEXT mode: vim's Normal mode with the cursor in the block |
 | 23 | `23-ex-command-line` | the `:` command line, with completion |
 | 24-25 | `24-sql-console`, `25-sql-tables` | the read-only troubleshooting console |
-| 26 | `26-panels-hidden` | sidebar and references hidden, outline full width |
+| 26 | `26-refs-hidden` | references hidden, outline full width |
+| 27 | `27-find-recent` | `Ctrl-P` with no query: what you touched last |
 
 ## Editing model
 
@@ -81,14 +82,14 @@ in. `Ctrl-]` or `gf` follows a link (`↗N` marks the blocks that have them),
 `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
 are listed in [DESIGN.md §7.5](DESIGN.md).
 
-**Getting around** does not depend on knowing where the panes are: `Ctrl-P` opens
-any page or journal (filter as you type), `Ctrl-w h`/`Ctrl-w l` focus the pages
-panel and the references, `[`/`]` step through journal days, and `/` searches
-every block. The hint bar is computed from what is possible right now, so it
-doubles as the manual.
+**Getting around** is one key: `Ctrl-P` opens **Find** — with no query it lists
+what you touched last, and as you type it searches page names *and* block text,
+landing on the matching block. `[`/`]` step through journal days, `Ctrl-w l`
+focuses the references, and `/` searches every block. There is no top bar and no
+page sidebar; the pane title says what you are looking at and the hint bar is
+computed from what is possible right now, so it doubles as the manual.
 
-Panels are toggles: `Ctrl-n` hides the sidebar, `Ctrl-b` hides the linked
-references, both persisted. Storage internals are not in the status bar at all —
+The linked references are a toggle (`Ctrl-b`, persisted). Storage internals are not in the status bar at all —
 they live behind `:sql`, a read-only SQL console (`SELECT`, `PRAGMA`, `EXPLAIN`,
 `WITH`, plus `.tables` and `.schema`). The last action prints on one line above
 the status bar and clears on the next keypress.

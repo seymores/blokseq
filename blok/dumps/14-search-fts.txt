@@ -1,4 +1,3 @@
- blok   / Search                                                                               37 blocks · 12 pages · 11 refs  local  09:41
 ╭ SEARCH  2 hits · bm25 ────────────────────────────────────────────────────────╮╭ BLOCK PREVIEW ──────────────────────────────────────────╮
 │▸ snapshot▏   FTS5 · porter unicode61                                          ││source  Pages / Project Aurora                           │
 │───────────────────────────────────────────────────────────────────────────────││block   blk-00000007                                     │
@@ -37,6 +36,7 @@
 │                                                                               ││                                                         │
 │                                                                               ││                                                         │
 │                                                                               ││                                                         │
+│                                                                               ││                                                         │
 ╰───────────────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────╯
- NORMAL  blocks  ·  "snapshot"  2 hits  ·  block #21                                                                  no snapshot yet — :w
+ NORMAL  2 hits
  type search every block   ↑↓ results   ⏎ open   Esc back

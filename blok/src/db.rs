@@ -1,13 +1,12 @@
 //! SQLite storage. There is no markdown document on disk, ever: blocks are rows,
 //! links are rows, and full-text search is an FTS5 index over the block table.
-//!
-//! Durability model (what the "remote backup" feature leans on):
+//!//! Durability model (what the "remote backup" feature leans on):
 //!   * WAL journal mode, so a crash never corrupts the file.
 //!   * `VACUUM INTO` produces a consistent, compacted single-file snapshot even
 //!     while the database is open -- safe to copy to a remote.
 //!   * `backup_log` records every snapshot, its size and where it was sent.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -1231,5 +1230,162 @@ impl Db {
                 (n, c)
             })
             .collect()
+    }
+}
+
+/// One row of the Find list: which page, why it matched, and where to land.
+#[derive(Clone, Debug)]
+pub struct PageHit {
+    pub name: String,
+    pub is_journal: bool,
+    pub blocks: i64,
+    pub updated_at: String,
+    /// The query matched the page *name*.
+    pub title_match: bool,
+    /// Set when the match was in a block, so `⏎` can land on that block.
+    pub block_id: Option<i64>,
+    pub snippet: Option<String>,
+}
+
+/// The Find picker's backend: a page-name match and a block-content match,
+/// merged in Rust so the ordering rule is explicit rather than an artefact of
+/// one clever UNION.
+impl Db {
+    /// The default list: whatever was touched last. Journals included, because a
+    /// day you wrote in is a page you will want back.
+    pub fn recent_pages(&self, limit: i64) -> Vec<PageHit> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT p.name, p.kind, p.updated_at,
+                        (SELECT COUNT(*) FROM blocks b
+                          WHERE b.page_id = p.id AND b.deleted_at IS NULL),
+                        (SELECT b.id FROM blocks b
+                          WHERE b.page_id = p.id AND b.deleted_at IS NULL AND TRIM(b.content) <> ''
+                          ORDER BY b.updated_at DESC LIMIT 1),
+                        (SELECT b.content FROM blocks b
+                          WHERE b.page_id = p.id AND b.deleted_at IS NULL AND TRIM(b.content) <> ''
+                          ORDER BY b.updated_at DESC LIMIT 1)
+                   FROM pages p
+                  WHERE p.deleted_at IS NULL
+                    AND EXISTS (SELECT 1 FROM blocks b
+                                 WHERE b.page_id = p.id AND b.deleted_at IS NULL
+                                   AND TRIM(b.content) <> '')
+                  ORDER BY p.updated_at DESC, p.name
+                  LIMIT ?1",
+            )
+            .unwrap();
+        let rows = stmt
+            .query_map(params![limit], |r| {
+                Ok(PageHit {
+                    name: r.get(0)?,
+                    is_journal: r.get::<_, String>(1)? == "journal",
+                    updated_at: r.get(2)?,
+                    blocks: r.get(3)?,
+                    block_id: r.get(4)?,
+                    snippet: r.get(5)?,
+                    title_match: false,
+                })
+            })
+            .unwrap();
+        rows.filter_map(|r| r.ok()).collect()
+    }
+
+    /// Title matches first, then block matches by relevance, one row per page.
+    pub fn find_pages(&self, query: &str, limit: i64) -> Vec<PageHit> {
+        let needle = query.trim();
+        if needle.is_empty() {
+            return self.recent_pages(limit);
+        }
+        let mut out: Vec<PageHit> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+
+        // 1. page names, case-insensitively
+        if let Ok(mut stmt) = self.conn.prepare(
+            "SELECT p.name, p.kind, p.updated_at,
+                    (SELECT COUNT(*) FROM blocks b
+                      WHERE b.page_id = p.id AND b.deleted_at IS NULL)
+               FROM pages p
+              WHERE p.deleted_at IS NULL AND p.name LIKE '%' || ?1 || '%'
+              ORDER BY p.updated_at DESC, p.name
+              LIMIT ?2",
+        ) {
+            if let Ok(rows) = stmt.query_map(params![needle, limit], |r| {
+                Ok(PageHit {
+                    name: r.get(0)?,
+                    is_journal: r.get::<_, String>(1)? == "journal",
+                    updated_at: r.get(2)?,
+                    blocks: r.get(3)?,
+                    title_match: true,
+                    block_id: None,
+                    snippet: None,
+                })
+            }) {
+                for hit in rows.filter_map(|r| r.ok()) {
+                    if seen.insert(hit.name.clone()) {
+                        out.push(hit);
+                    }
+                }
+            }
+        }
+
+        // 2. block content -- FTS5 when the build has it, LIKE otherwise
+        let content_sql = if self.fts {
+            "SELECT p.name, p.kind, p.updated_at, b.id, b.content,
+                    (SELECT COUNT(*) FROM blocks c WHERE c.page_id = p.id AND c.deleted_at IS NULL)
+               FROM blocks_fts f
+               JOIN blocks b ON b.id = f.rowid
+               JOIN pages  p ON p.id = b.page_id
+              WHERE blocks_fts MATCH ?1
+                AND b.deleted_at IS NULL AND p.deleted_at IS NULL
+              ORDER BY bm25(blocks_fts)
+              LIMIT ?2"
+        } else {
+            "SELECT p.name, p.kind, p.updated_at, b.id, b.content,
+                    (SELECT COUNT(*) FROM blocks c WHERE c.page_id = p.id AND c.deleted_at IS NULL)
+               FROM blocks b
+               JOIN pages p ON p.id = b.page_id
+              WHERE b.deleted_at IS NULL AND p.deleted_at IS NULL
+                AND b.content LIKE '%' || ?1 || '%'
+              ORDER BY b.updated_at DESC
+              LIMIT ?2"
+        };
+        let param = if self.fts {
+            needle
+                .split_whitespace()
+                .map(|t| format!("\"{}\"*", t.replace('"', "")))
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else {
+            needle.to_string()
+        };
+        if let Ok(mut stmt) = self.conn.prepare(content_sql) {
+            if let Ok(rows) = stmt.query_map(params![param, limit], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, i64>(3)?,
+                    r.get::<_, String>(4)?,
+                    r.get::<_, i64>(5)?,
+                ))
+            }) {
+                for (name, kind, updated, block_id, content, blocks) in rows.filter_map(|r| r.ok()) {
+                    if seen.insert(name.clone()) {
+                        out.push(PageHit {
+                            name,
+                            is_journal: kind == "journal",
+                            blocks,
+                            updated_at: updated,
+                            title_match: false,
+                            block_id: Some(block_id),
+                            snippet: Some(content),
+                        });
+                    }
+                }
+            }
+        }
+        out.truncate(limit as usize);
+        out
     }
 }

@@ -64,7 +64,6 @@ pub enum InsertAt {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Focus {
-    Sidebar,
     Main,
     Right,
 }
@@ -83,22 +82,10 @@ pub struct Toast {
     pub sub: Option<String>,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum ItemKind {
-    Section,
-    Journal,
-    Page,
-    Favorite,
-}
-
 #[derive(Clone, Debug)]
-pub struct SidebarItem {
-    pub kind: ItemKind,
+pub struct FindRow {
     pub label: String,
-    pub badge: String,
-    pub view: Option<View>,
-    pub today: bool,
-    pub provisional: bool,
+    pub detail: String,
 }
 
 #[derive(Clone, Debug)]
@@ -109,12 +96,33 @@ pub struct PopupState {
     pub selected: usize,
 }
 
+/// One row of the Find picker.
+#[derive(Clone, Debug)]
+pub struct FindItem {
+    pub label: String,
+    pub detail: String,
+    pub action: FindAction,
+    /// Matched on the page name rather than on a block's content.
+    pub title_match: bool,
+}
+
+#[derive(Clone, Debug)]
+pub enum FindAction {
+    /// Open a page, optionally landing on the block that matched.
+    Page(String, Option<i64>),
+    Journal(JournalDay),
+}
+
+/// `Ctrl-P`: the only navigation surface there is. With no query it lists what
+/// you touched last; as you type it becomes a search across page names *and*
+/// block text, so "where was that thing" and "go to that page" are one key.
 #[derive(Clone, Debug)]
 pub struct Palette {
     pub query: String,
-    pub all: Vec<(String, String, String)>, // label, detail, action
-    pub filtered: Vec<usize>,
+    pub items: Vec<FindItem>,
     pub selected: usize,
+    /// True while the list is the default "recent" one rather than a search.
+    pub recent: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -181,13 +189,9 @@ pub struct App {
     pub undo: Vec<UndoOp>,
     pub redo: Vec<UndoOp>,
 
-    /// Panels are furniture only if you want them. Both persist in `settings`.
-    pub show_sidebar: bool,
+    /// The linked-references pane is the one panel left, and it stays a toggle.
     pub show_refs: bool,
 
-    pub sidebar: Vec<SidebarItem>,
-    pub sidebar_selected: usize,
-    pub sidebar_scroll: usize,
     pub right_selected: usize,
     pub linked: Vec<(String, Vec<RefHit>)>,
     pub linked_selected: usize,
@@ -218,8 +222,8 @@ pub struct App {
 
 impl App {
     pub fn new(db: Db, today: NaiveDate) -> Self {
-        // Panel visibility is a preference, not a hard-coded layout.
-        let show_sidebar = db.bool_setting("show_sidebar", true);
+        // Whether the references pane is showing is a preference, not a
+        // hard-coded layout. There is no sidebar to prefer any more.
         let show_refs = db.bool_setting("show_refs", true);
         let mut app = Self {
             db,
@@ -249,11 +253,7 @@ impl App {
             history_pos: 0,
             undo: Vec::new(),
             redo: Vec::new(),
-            show_sidebar,
             show_refs,
-            sidebar: Vec::new(),
-            sidebar_selected: 0,
-            sidebar_scroll: 0,
             right_selected: 0,
             linked: Vec::new(),
             linked_selected: 0,
@@ -281,7 +281,6 @@ impl App {
     // ------------------------------------------------------------- loading
 
     pub fn reload(&mut self) {
-        self.build_sidebar();
         self.load_view();
         self.load_right();
     }
@@ -360,117 +359,6 @@ impl App {
             self.selected = 0;
         } else if self.selected >= self.rows.len() {
             self.selected = self.rows.len() - 1;
-        }
-    }
-
-    pub fn build_sidebar(&mut self) {
-        let mut items: Vec<SidebarItem> = Vec::new();
-        items.push(SidebarItem {
-            kind: ItemKind::Section,
-            label: "TODAY".into(),
-            badge: String::new(),
-            view: None,
-            today: false,
-            provisional: false,
-        });
-        let today = JournalDay::new(self.today);
-        let jp = self.db.journal_page(today);
-        items.push(SidebarItem {
-            kind: ItemKind::Favorite,
-            label: today.title(),
-            badge: match &jp {
-                Some(_) => {
-                    let n = self.db.rows(jp.as_ref().unwrap().id).len();
-                    if n == 0 {
-                        "empty · pruned".into()
-                    } else {
-                        format!("{} blocks", n)
-                    }
-                }
-                None => "provisional".into(),
-            },
-            view: Some(View::Journal(today)),
-            today: true,
-            provisional: jp.is_none(),
-        });
-        items.push(SidebarItem {
-            kind: ItemKind::Section,
-            label: "JOURNALS".into(),
-            badge: String::new(),
-            view: None,
-            today: false,
-            provisional: false,
-        });
-        for (day, n, _preview) in self.db.journals(14) {
-            if day.date == self.today {
-                continue;
-            }
-            items.push(SidebarItem {
-                kind: ItemKind::Journal,
-                label: day.relative(self.today),
-                badge: format!("{} · {}", day.short(), n),
-                view: Some(View::Journal(day)),
-                today: false,
-                provisional: false,
-            });
-        }
-        items.push(SidebarItem {
-            kind: ItemKind::Section,
-            label: "PAGES".into(),
-            badge: String::new(),
-            view: None,
-            today: false,
-            provisional: false,
-        });
-        for (name, links, blocks) in self.db.pages(40) {
-            items.push(SidebarItem {
-                kind: ItemKind::Page,
-                label: name,
-                badge: if links > 0 {
-                    format!("{}↗ · {}b", links, blocks)
-                } else {
-                    format!("{}b", blocks)
-                },
-                view: Some(View::Page(String::new())),
-                today: false,
-                provisional: false,
-            });
-        }
-        // The Page items above carry a placeholder view; fill real names in a
-        // second pass so we keep the query simple.
-        let pages = self.db.pages(40);
-        let mut pi = 0usize;
-        for it in items.iter_mut() {
-            if it.kind == ItemKind::Page {
-                if let Some((name, _, _)) = pages.get(pi) {
-                    it.view = Some(View::Page(name.clone()));
-                }
-                pi += 1;
-            }
-        }
-        self.sidebar = items;
-        self.sidebar_clamp();
-    }
-
-    fn sidebar_clamp(&mut self) {
-        let sel = self
-            .sidebar
-            .iter()
-            .enumerate()
-            .filter(|(_, i)| i.kind != ItemKind::Section)
-            .map(|(idx, _)| idx)
-            .collect::<Vec<_>>();
-        if sel.is_empty() {
-            self.sidebar_selected = 0;
-            return;
-        }
-        if !sel.contains(&self.sidebar_selected) {
-            // snap to the closest selectable entry
-            self.sidebar_selected = sel
-                .iter()
-                .copied()
-                .min_by_key(|i| (*i as i64 - self.sidebar_selected as i64).abs())
-                .unwrap_or(sel[0]);
         }
     }
 
@@ -1067,62 +955,116 @@ impl App {
 
     // -------------------------------------------------------------- palette
 
-    /// `Ctrl-P`: the open-page picker. Pages and journals, most useful first --
-    /// this is the answer to "how do I get to another page", which no longer
-    /// depends on finding the right pane first. Commands live in `:`.
+    // --------------------------------------------------------------- find
+
+    /// `Ctrl-P`. Open it and you see what you touched last; type and it becomes
+    /// a search over page names *and* block text. This is the whole navigation
+    /// story: no sidebar, no page tree, no top bar.
     pub fn open_palette(&mut self) {
-        let mut all: Vec<(String, String, String)> = Vec::new();
-        let today = JournalDay::new(self.today);
-        all.push((
-            format!("{}  (today)", today.key()),
-            "journal".into(),
-            format!("journal:{}", today.key()),
-        ));
-        for (day, blocks, _preview) in self.db.journals(30) {
-            if day.date == self.today {
-                continue;
-            }
-            all.push((
-                day.key(),
-                format!("journal · {} · {} blocks", day.relative(self.today), blocks),
-                format!("journal:{}", day.key()),
-            ));
-        }
-        for (name, links, blocks) in self.db.pages(200) {
-            let action = format!("page:{}", name);
-            all.push((
-                name,
-                format!("page · {} blocks · {} links", blocks, links),
-                action,
-            ));
-        }
-        let mut p = Palette {
+        self.palette = Some(Palette {
             query: String::new(),
-            all,
-            filtered: Vec::new(),
+            items: Vec::new(),
             selected: 0,
+            recent: true,
+        });
+        self.palette_refresh();
+    }
+
+    /// Re-run the list for the current query. Called on every keystroke: the
+    /// database is local and the index is FTS5, so a query per key is cheap.
+    pub fn palette_refresh(&mut self) {
+        let Some(p) = self.palette.as_ref() else { return };
+        let query = p.query.clone();
+        let recent = query.trim().is_empty();
+        let hits = if recent {
+            self.db.recent_pages(40)
+        } else {
+            self.db.find_pages(&query, 40)
         };
-        p.filtered = (0..p.all.len()).collect();
-        self.palette = Some(p);
+        let today = self.today;
+        let items: Vec<FindItem> = hits
+            .into_iter()
+            .map(|h| {
+                let detail = if h.is_journal {
+                    match crate::model::parse_journal_key(&h.name) {
+                        Some(day) => format!(
+                            "journal · {} · {} block{}",
+                            day.relative(today),
+                            h.blocks,
+                            plural(h.blocks as usize)
+                        ),
+                        None => format!("journal · {} blocks", h.blocks),
+                    }
+                } else if h.title_match || h.snippet.is_none() {
+                    format!("page · {} block{}", h.blocks, plural(h.blocks as usize))
+                } else if recent {
+                    // No query, so this is not a match: it is the last thing
+                    // written on that page, which is the useful preview.
+                    format!(
+                        "last: {}",
+                        crate::app::snippet(h.snippet.as_deref().unwrap_or(""), 60)
+                    )
+                } else {
+                    // Say *why* it matched, so a content hit is verifiable.
+                    format!(
+                        "matched in a block: {}",
+                        crate::app::snippet(h.snippet.as_deref().unwrap_or(""), 60)
+                    )
+                };
+                let label = if h.is_journal {
+                    match crate::model::parse_journal_key(&h.name) {
+                        Some(day) => format!("{}  ({})", day.relative(today), h.name),
+                        None => h.name.clone(),
+                    }
+                } else {
+                    h.name.clone()
+                };
+                let action = match crate::model::parse_journal_key(&h.name) {
+                    Some(day) if h.is_journal => FindAction::Journal(day),
+                    _ => FindAction::Page(h.name.clone(), h.block_id),
+                };
+                FindItem {
+                    label,
+                    detail,
+                    action,
+                    title_match: h.title_match,
+                }
+            })
+            .collect();
+        if let Some(p) = self.palette.as_mut() {
+            p.selected = 0;
+            p.recent = recent;
+            p.items = items;
+        }
     }
 
     pub fn palette_input(&mut self, c: char) {
-        if let Some(p) = self.palette.as_mut() {
+        let changed = if let Some(p) = self.palette.as_mut() {
             p.query.push(c);
-            p.refilter();
+            true
+        } else {
+            false
+        };
+        if changed {
+            self.palette_refresh();
         }
     }
 
     pub fn palette_backspace(&mut self) {
-        if let Some(p) = self.palette.as_mut() {
+        let changed = if let Some(p) = self.palette.as_mut() {
             p.query.pop();
-            p.refilter();
+            true
+        } else {
+            false
+        };
+        if changed {
+            self.palette_refresh();
         }
     }
 
     pub fn palette_move(&mut self, delta: i64) {
         if let Some(p) = self.palette.as_mut() {
-            let n = p.filtered.len() as i64;
+            let n = p.items.len() as i64;
             if n > 0 {
                 p.selected = ((p.selected as i64 + delta).rem_euclid(n)) as usize;
             }
@@ -1131,30 +1073,24 @@ impl App {
 
     pub fn palette_accept(&mut self) {
         let Some(p) = self.palette.clone() else { return };
-        let Some(idx) = p.filtered.get(p.selected) else {
+        let Some(item) = p.items.get(p.selected).cloned() else {
             self.palette = None;
             return;
         };
-        let action = p.all[*idx].2.clone();
-        let label = p.all[*idx].0.clone();
         self.palette = None;
-        if let Some(key) = action.strip_prefix("journal:") {
-            match crate::model::parse_journal_key(key) {
-                Some(day) => {
-                    self.push_history();
-                    self.goto_journal(day);
+        self.push_history();
+        match item.action {
+            FindAction::Journal(day) => self.goto_journal(day),
+            FindAction::Page(name, block) => {
+                self.goto_page(&name);
+                if let Some(id) = block {
+                    // Land on the block that matched, not just the page.
+                    self.select_block(id);
+                    self.scroll_to_selection();
                 }
-                None => self.toast(ToastKind::Warn, "not a journal day", None),
+                self.toast(ToastKind::Info, &format!("→ {}", name), Some("Ctrl-o back"));
             }
-            return;
         }
-        if let Some(name) = action.strip_prefix("page:") {
-            self.push_history();
-            self.goto_page(name);
-            let _ = label;
-            return;
-        }
-        self.toast(ToastKind::Warn, &format!("nothing to open for {}", label), None);
     }
 
     // --------------------------------------------------------------- search
@@ -1409,46 +1345,6 @@ impl App {
         }
     }
 
-    pub fn sidebar_step(&mut self, delta: i64) {
-        let sel: Vec<usize> = self
-            .sidebar
-            .iter()
-            .enumerate()
-            .filter(|(_, i)| i.kind != ItemKind::Section)
-            .map(|(idx, _)| idx)
-            .collect();
-        if sel.is_empty() {
-            return;
-        }
-        let cur = sel
-            .iter()
-            .position(|i| *i == self.sidebar_selected)
-            .unwrap_or(0) as i64;
-        let next = (cur + delta).clamp(0, sel.len() as i64 - 1) as usize;
-        self.sidebar_selected = sel[next];
-        if self.sidebar_selected < self.sidebar_scroll {
-            self.sidebar_scroll = self.sidebar_selected;
-        }
-    }
-}
-
-impl Palette {
-    pub fn refilter(&mut self) {
-        let q = self.query.clone();
-        let mut scored: Vec<(i32, usize)> = self
-            .all
-            .iter()
-            .enumerate()
-            .filter_map(|(i, (label, detail, _))| {
-                fuzzy(&q, label)
-                    .map(|(s, _)| (s, i))
-                    .or_else(|| fuzzy(&q, detail).map(|(s, _)| (s - 10, i)))
-            })
-            .collect();
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
-        self.filtered = scored.into_iter().map(|(_, i)| i).collect();
-        self.selected = 0;
-    }
 }
 
 fn plural(n: usize) -> &'static str {
@@ -1527,14 +1423,17 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("[[ (( #", "page link · block ref · tag", "Insert"),
     ("Commands", "", ""),
     (":", "ex command line (Tab completes, :help lists)", "Normal"),
-    ("Ctrl-P", "command palette", "Any"),
+    ("Ctrl-P", "Find: recent pages, then a search of names and block text", "Any"),
     ("/ n N", "search the graph · next · previous", "Normal"),
     ("?", "this keymap", "Any"),
+    ("Navigation", "", ""),
+    ("[ / ]", "previous / next journal day", "Normal"),
+    ("Ctrl-w l", "focus the references pane", "Normal"),
+    ("Ctrl-o / Ctrl-i", "jump back / forward", "Normal"),
     ("Panels and troubleshooting", "", ""),
-    ("Ctrl-n", "show / hide the sidebar", "Any"),
-    ("Ctrl-b", "show / hide linked references", "Any"),
-    (":set sidebar|nosidebar|refs|norefs", "the same, spelled out, and persisted", "Ex"),
-    (":sql", "read-only SQL console (out of the status bar, on demand)", "Ex"),
+    ("Ctrl-b", "show / hide the linked references", "Any"),
+    (":set refs | norefs", "the same, spelled out, and persisted", "Ex"),
+    (":sql", "read-only SQL console, on demand", "Ex"),
     (":w", "snapshot + queue for the remote", "Ex"),
     ("Ctrl-S", "snapshot, then the storage screen", "Any"),
     ("q / :q", "quit, pruning unwritten journals first", "Normal"),
@@ -1551,7 +1450,7 @@ pub const EX_COMMANDS: &[(&str, &str)] = &[
     ("wq", "snapshot, then quit"),
     ("q", "quit (prunes empty journals)"),
     ("q!", "quit without the prune pass"),
-    ("set ", "`set sidebar`, `set nosidebar`, `set refs`, `set norefs`"),
+    ("set ", "`set refs`, `set norefs`"),
     ("board", "open the TODO board"),
     ("storage", "storage and backup screen"),
     ("today", "jump to today's journal"),

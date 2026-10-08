@@ -1,42 +1,42 @@
- blok   ? Keyboard                                                                             37 blocks · 12 pages · 11 refs  local  09:41
-╭ KEYMAP · NAVIGATION & EDITING ────────────────────────────────────────╮╭ KEYMAP · LINKS & PERSISTENCE ───────────────────────────────────╮
-│                                                                       ││                                                                 │
-│  MODES                                                                ││  TEXT MOTIONS                                                   │
-│  Esc                 insert → text → blocks (vim's ladder)   Any      ││  w b e 0 ^ $         word and line motions inside one block  Tex│
-│  Enter               put the cursor in this block's text     Normal   ││  x dw d$ D           delete char · word · to line end        Tex│
-│  i a I A             insert · append · line start · line end Normal   ││  cw ciw C            change word · to line end               Tex│
-│  o O cc              open a block below · above · change thi…Normal   ││  Ctrl-w / Ctrl-u     delete word / to line start             Ins│
-│  v / V               select a block range / a whole subtree  Normal   ││                                                                 │
-│                                                                       ││  INLINE COMPLETION                                              │
-│  BLOCK MOTIONS                                                        ││  /                   slash commands inside a block           Ins│
-│  j k h l             next · previous · parent · first child  Normal   ││  [[ (( #             page link · block ref · tag             Ins│
-│  gg G                first · last block                      Normal   ││                                                                 │
-│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││  COMMANDS                                                       │
-│  [ / ]               previous / next journal day             Normal   ││  :                   ex command line (Tab completes, :help l…Nor│
-│  Ctrl-w h l w        focus sidebar · references · cycle      Normal   ││  Ctrl-P              command palette                         Any│
-│                                                                       ││  / n N               search the graph · next · previous      Nor│
-│  FOLLOWING LINKS                                                      ││  ?                   this keymap                             Any│
-│  Ctrl-]              follow the link here (menu when there a…Normal   ││                                                                 │
-│  Ctrl-o / Ctrl-i     jump back / forward                     Normal   ││  PANELS AND TROUBLESHOOTING                                     │
-│  Enter in refs       open the block that references this pageNormal   ││  Ctrl-n              show / hide the sidebar                 Any│
-│                                                                       ││  Ctrl-b              show / hide linked references           Any│
-│  OPERATORS                                                            ││  :set sidebar|nosidebar|refs|norefsthe same, spelled out, and pe│
-│  dd / x              delete block, subtree included          Normal   ││  :sql                read-only SQL console (out of the statu…Ex │
-│  yy / Y              yank block into the register            Normal   ││  :w                  snapshot + queue for the remote         Ex │
-│  p / P               paste register after / before           Normal   ││  Ctrl-S              snapshot, then the storage screen       Any│
-│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││  q / :q              quit, pruning unwritten journals first  Nor│
-│  J                   join this block with the one below      Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
-│  u / Ctrl-r          undo / redo                             Any      ││                                                                 │
-│  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││  VIEWS                                                          │
-│                                                                       ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
-│                                                                       ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
-╰───────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
- NORMAL  blocks  ·  Esc goes back  ·  block #21                                                                       no snapshot yet — :w
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ NORMAL  Esc goes back
  Esc back   q quit

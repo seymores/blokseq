@@ -1,4 +1,3 @@
- blok   SQL console  ·  read-only  Esc  leaves                                                 37 blocks · 12 pages · 11 refs  local  09:41
 ╭ SQL CONSOLE  read-only · SELECT, PRAGMA, EXPLAIN, WITH ──────────────────────────────────────────────────────────────────────────────────╮
 │sqlite> ▏                                                                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -37,6 +36,7 @@
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
+│                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- NORMAL  blocks  ·  read-only. `.tables` · `.schema blocks` · any SELECT or PRAGMA  ·  block #21                      no snapshot yet — :w
+ NORMAL  read-only. `.tables` · `.schema blocks` · any SELECT or PRAGMA
  ⏎ run   .tables list tables   ↑↓ history   Esc leave

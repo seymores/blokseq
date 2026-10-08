@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::app::{App, Focus, ItemKind, ToastKind, View, KEYMAP};
+use crate::app::{App, Focus, ToastKind, View, KEYMAP};
 use crate::db::human_bytes;
 use crate::editor::{Editor, Mode};
 use crate::model::{properties, JournalDay, Row};
@@ -15,12 +15,12 @@ use crate::theme::{self, Theme};
 
 pub fn render(f: &mut Frame, app: &mut App) {
     let area = f.area();
-    // The command line, and a one-line message area, take rows from the body
-    // while they are in use -- vim's cmdline and `:echo`, not a floating box.
+    // No top bar. What you are looking at is the pane's own title, and what you
+    // can do is the hint bar; a second header row only repeated both.
+    // The command line and the one-line message area borrow a row while in use.
     let ex_h = if app.ex.is_some() { 1 } else { 0 };
     let msg_h = if app.toast.is_some() { 1 } else { 0 };
     let chunks = Layout::vertical([
-        Constraint::Length(1),     // title bar
         Constraint::Min(4),        // body
         Constraint::Length(msg_h), // what just happened; any key clears it
         Constraint::Length(ex_h),  // : command line
@@ -29,16 +29,14 @@ pub fn render(f: &mut Frame, app: &mut App) {
     ])
     .split(area);
 
-    render_titlebar(f, app, chunks[0]);
-
     let caret = match app.view {
-        View::Journal(_) | View::Page(_) => render_workspace(f, app, chunks[1]),
+        View::Journal(_) | View::Page(_) => render_workspace(f, app, chunks[0]),
         View::Search => {
-            render_search(f, app, chunks[1]);
+            render_search(f, app, chunks[0]);
             None
         }
         View::Query => {
-            render_query(f, app, chunks[1]);
+            render_query(f, app, chunks[0]);
             None
         }
         View::Backup => {
@@ -50,168 +48,56 @@ pub fn render(f: &mut Frame, app: &mut App) {
             None
         }
         View::Sql => {
-            render_sql(f, app, chunks[1]);
+            render_sql(f, app, chunks[0]);
             None
         }
     };
 
     if let Some((x, y)) = caret {
         if app.popup.is_some() {
-            render_popup(f, app, x, y, chunks[1]);
+            render_popup(f, app, x, y, chunks[0]);
         }
     }
     if let Some(p) = app.palette.clone() {
-        render_palette(f, app, &p, chunks[1]);
+        render_palette(f, app, &p, chunks[0]);
     }
     if msg_h > 0 {
-        render_message(f, app, chunks[2]);
+        render_message(f, app, chunks[1]);
     }
     if ex_h > 0 {
-        render_ex(f, app, chunks[3]);
+        render_ex(f, app, chunks[2]);
     }
-    render_status(f, app, chunks[4]);
-    render_hints(f, app, chunks[5]);
-}
-
-// ---------------------------------------------------------------- title bar
-
-fn render_titlebar(f: &mut Frame, app: &App, area: Rect) {
-    let compact = area.width < 104;
-    let right_w = if compact { 20 } else { 58 };
-    let halves = Layout::horizontal([Constraint::Min(20), Constraint::Length(right_w)]).split(area);
-    let mut left = vec![
-        Span::styled(" blok ", Style::default().fg(theme::BG).bg(theme::CYAN).bold()),
-        Span::styled("  ", Theme::base()),
-    ];
-    match &app.view {
-        View::Journal(day) => {
-            left.push(Span::styled("Journal", Theme::title()));
-            left.push(Span::styled("  ·  ", Theme::base().fg(theme::FAINT)));
-            left.push(Span::styled(
-                if compact {
-                    day.short()
-                } else {
-                    day.title()
-                },
-                Theme::base(),
-            ));
-            if day.date == app.today {
-                left.push(Span::styled("  TODAY ", Theme::badge(theme::GREEN)));
-            }
-            if app.provisional {
-                left.push(Span::styled("  PROVISIONAL ", Theme::badge(theme::ORANGE)));
-            }
-        }
-        View::Page(name) => {
-            left.push(Span::styled("# Page", Theme::title()));
-            left.push(Span::styled("  ·  ", Theme::base().fg(theme::FAINT)));
-            left.push(Span::styled(name.clone(), Theme::base()));
-        }
-        View::Search => left.push(Span::styled("/ Search", Theme::title())),
-        View::Query => left.push(Span::styled("TODO board", Theme::title())),
-        View::Backup => left.push(Span::styled("Storage & backup", Theme::title())),
-        View::Help => left.push(Span::styled("? Keyboard", Theme::title())),
-        View::Sql => {
-            left.push(Span::styled("SQL console", Theme::title()));
-            left.push(Span::styled("  ·  ", Theme::base().fg(theme::FAINT)));
-            left.push(Span::styled("read-only", Theme::base().fg(theme::DIM)));
-            left.push(Span::styled("  Esc ", Theme::badge(theme::DIM)));
-            left.push(Span::styled(" leaves", Theme::base().fg(theme::FAINT)));
-        }
-    }
-    f.render_widget(Paragraph::new(Line::from(left)).style(Theme::base()), halves[0]);
-
-    let stats = &app.db.stats;
-    let mut right_spans: Vec<Span> = Vec::new();
-    if !compact {
-        right_spans.push(Span::styled(
-            format!(
-                "{} blocks · {} pages · {} refs ",
-                stats.blocks, stats.pages, stats.refs
-            ),
-            Theme::base().fg(theme::DIM),
-        ));
-    }
-    right_spans.push(Span::styled(
-        format!(
-            " {} ",
-            if app.last_backup.is_some() {
-                "synced"
-            } else {
-                "local"
-            }
-        ),
-        Style::default()
-            .fg(theme::BG)
-            .bg(if app.last_backup.is_some() {
-                theme::GREEN
-            } else {
-                theme::YELLOW
-            })
-            .bold(),
-    ));
-    right_spans.push(Span::styled(
-        format!(" {} ", app.clock),
-        Theme::base().fg(theme::FAINT),
-    ));
-    let right = Line::from(right_spans);
-    f.render_widget(
-        Paragraph::new(right)
-            .style(Theme::base())
-            .alignment(Alignment::Right),
-        halves[1],
-    );
+    render_status(f, app, chunks[3]);
+    render_hints(f, app, chunks[4]);
 }
 
 // --------------------------------------------------------------- workspace
 
-/// Journal / page screen: sidebar, outliner, references. Either side panel can
-/// be hidden (Ctrl-n / Ctrl-b, or `:set nosidebar` / `:set norefs`), and the
-/// outline takes the space -- panels are preferences, not furniture.
+/// Journal / page screen: the outline, and optionally the references beside it.
+/// There is no page sidebar: `Ctrl-P` (Find) is how you go somewhere.
 fn render_workspace(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16)> {
     let w = area.width;
-    // The sidebar needs ~20 columns to be worth having; below that it is off.
-    // Hiding a panel is the user's decision (Ctrl-n / :set nosidebar), not
-    // something a 79-column terminal does behind their back.
-    let left_w = if !app.show_sidebar {
-        0
-    } else if w >= 120 {
-        28
-    } else if w >= 100 {
-        26
-    } else if w >= 72 {
-        22
-    } else {
-        0
-    };
     // References carry real text, so they need real width; below ~96 columns
-    // they crowd the outline and go away, and the status bar says so.
+    // they crowd the outline and step aside, and the hint bar offers Ctrl-b.
     let right_w = if !app.show_refs {
         0
-    } else if w >= 150 {
+    } else if w >= 140 {
         40
-    } else if w >= 128 {
+    } else if w >= 120 {
         34
-    } else if w >= 110 {
-        32
+    } else if w >= 106 {
+        30
     } else if w >= 96 {
-        28
+        26
     } else {
         0
     };
-    let chunks = Layout::horizontal([
-        Constraint::Length(left_w),
-        Constraint::Min(30),
-        Constraint::Length(right_w),
-    ])
-    .split(area);
+    let chunks =
+        Layout::horizontal([Constraint::Min(40), Constraint::Length(right_w)]).split(area);
 
-    if left_w > 0 {
-        render_sidebar(f, app, chunks[0]);
-    }
-    let caret = render_outliner(f, app, chunks[1]);
+    let caret = render_outliner(f, app, chunks[0]);
     if right_w > 0 {
-        render_refs(f, app, chunks[2]);
+        render_refs(f, app, chunks[1]);
     }
     caret
 }
@@ -236,159 +122,45 @@ fn panel(title: &str, focused: bool, extra: Option<Span<'static>>) -> Block<'sta
         .title(Line::from(t))
 }
 
-fn render_sidebar(f: &mut Frame, app: &App, area: Rect) {
-    let focused = app.focus == Focus::Sidebar;
-    let inner = Rect {
-        x: area.x + 1,
-        y: area.y + 1,
-        width: area.width.saturating_sub(2),
-        height: area.height.saturating_sub(2),
-    };
-    f.render_widget(
-        panel(
-            "GRAPH",
-            focused,
-            Some(Span::styled(
-                format!(" {} ", app.db.stats.pages),
-                Theme::section(),
-            )),
-        ),
-        area,
-    );
-
-    let mut lines: Vec<Line> = Vec::new();
-    for (i, item) in app.sidebar.iter().enumerate() {
-        let selected = i == app.sidebar_selected;
-        match item.kind {
-            ItemKind::Section => {
-                if i > 0 {
-                    lines.push(Line::from(""));
-                }
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{}", item.label), Theme::section()),
-                    Span::styled(
-                        " ".repeat(12usize.saturating_sub(item.label.len())),
-                        Theme::panel(),
-                    ),
-                ]));
-            }
-            _ => {
-                let marker = if selected && focused {
-                    "▌"
-                } else if item.today {
-                    "●"
-                } else if item.provisional {
-                    "○"
-                } else {
-                    " "
-                };
-                let mut label = item.label.clone();
-                let max = inner.width.saturating_sub(4) as usize;
-                if label.chars().count() > max {
-                    label = label.chars().take(max.saturating_sub(1)).collect::<String>() + "…";
-                }
-                let style = if selected && focused {
-                    Theme::selected()
-                } else if item.today {
-                    Style::default().fg(theme::FG).bg(theme::PANEL)
-                } else {
-                    Style::default().fg(theme::DIM).bg(theme::PANEL)
-                };
-                let marker_style = if item.provisional {
-                    Style::default().fg(theme::ORANGE).bg(style.bg.unwrap_or(theme::PANEL))
-                } else if item.today {
-                    Style::default().fg(theme::GREEN).bg(style.bg.unwrap_or(theme::PANEL))
-                } else {
-                    Style::default().fg(theme::FAINT).bg(style.bg.unwrap_or(theme::PANEL))
-                };
-                let pad = inner
-                    .width
-                    .saturating_sub(2)
-                    .saturating_sub(label.chars().count() as u16) as usize;
-                let badge = if item.badge.is_empty() {
-                    String::new()
-                } else {
-                    let b = format!(" {}", item.badge);
-                    if b.chars().count() < pad {
-                        b
-                    } else {
-                        String::new()
-                    }
-                };
-                let fill = " ".repeat(
-                    pad.saturating_sub(badge.chars().count()),
-                );
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", marker), marker_style),
-                    Span::styled(label, style),
-                    Span::styled(fill, style),
-                    Span::styled(badge, style.patch(Style::default().fg(theme::FAINT))),
-                ]));
-            }
-        }
-    }
-
-    let visible = inner.height as usize;
-    let start = if app.sidebar_selected >= app.sidebar_scroll + visible {
-        app.sidebar_selected + 1 - visible
-    } else {
-        app.sidebar_scroll
-    };
-    let slice: Vec<Line> = lines.into_iter().skip(start).take(visible).collect();
-    f.render_widget(Paragraph::new(slice).style(Theme::panel()), inner);
-
-    if inner.height > 3 {
-        let footer = Rect {
-            x: inner.x,
-            y: inner.y + inner.height - 2,
-            width: inner.width,
-            height: 2,
-        };
-        f.render_widget(
-            Paragraph::new(vec![
-                Line::from(Span::styled(
-                    "─".repeat(inner.width as usize),
-                    Theme::faint(),
-                )),
-                Line::from(vec![
-                    Span::styled("graph  ", Theme::faint()),
-                    Span::styled(
-                        format!("{} journals · {} pages", app.db.stats.journals, app.db.stats.pages),
-                        Theme::dim(),
-                    ),
-                ]),
-            ])
-            .style(Theme::panel()),
-            footer,
-        );
-    }
-}
-
 // ----------------------------------------------------------------- outliner
 
 fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16)> {
     let focused = app.focus == Focus::Main;
+    // The pane title is the *only* place you are told what you are looking at:
+    // a journal day by date, a page by name, an unwritten day as provisional.
     let title = match &app.view {
-        View::Journal(_) => "JOURNAL",
-        View::Page(_) => "PAGE",
-        _ => "BLOCKS",
+        View::Journal(day) => {
+            if app.provisional {
+                format!("{} · provisional", day.key())
+            } else {
+                day.key().to_string()
+            }
+        }
+        View::Page(name) => name.clone(),
+        _ => "blocks".to_string(),
     };
-    let crumb = match &app.view {
-        View::Journal(day) => format!("{}", day.title()),
-        View::Page(name) => format!("Pages / {}", name),
-        _ => String::new(),
-    };
-    f.render_widget(
-        panel(
-            title,
-            focused,
+    let extra = match &app.view {
+        View::Journal(day) => {
+            let when = if day.date == app.today {
+                "today".to_string()
+            } else {
+                day.relative(app.today)
+            };
             Some(Span::styled(
-                format!(" {} ", crumb),
+                format!(" {} · {} blocks ", when, app.rows.len()),
                 Theme::section().fg(theme::DIM),
-            )),
-        ),
-        area,
-    );
+            ))
+        }
+        View::Page(_) => {
+            let refs: usize = app.linked.iter().map(|(_, v)| v.len()).sum();
+            Some(Span::styled(
+                format!(" {} blocks · {} refs ", app.rows.len(), refs),
+                Theme::section().fg(theme::DIM),
+            ))
+        }
+        _ => None,
+    };
+    f.render_widget(panel(&title, focused, extra), area);
     let inner = Rect {
         x: area.x + 1,
         y: area.y + 1,
@@ -399,50 +171,10 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
         return None;
     }
 
-    // Header strip inside the pane: breadcrumb + counts.
-    let mut header: Vec<Line> = Vec::new();
-    match &app.view {
-        View::Journal(day) => {
-            let mut chips = vec![
-                Span::styled(day.title(), Theme::panel().fg(theme::FG).bold()),
-                Span::styled("  ", Theme::panel()),
-            ];
-            if day.date == app.today {
-                chips.push(Span::styled(" today ", Theme::badge(theme::GREEN)));
-                chips.push(Span::styled("  ", Theme::panel()));
-            }
-            chips.push(Span::styled(
-                format!("{} blocks", app.rows.len()),
-                Theme::dim(),
-            ));
-            if app.provisional {
-                chips.push(Span::styled("  ·  ", Theme::faint()));
-                chips.push(Span::styled("not in the database yet", Theme::dim().fg(theme::ORANGE)));
-            }
-            header.push(Line::from(chips));
-            header.push(Line::from(Span::styled(
-                "─".repeat(inner.width as usize),
-                Theme::faint(),
-            )));
-        }
-        View::Page(name) => {
-            header.push(Line::from(vec![
-                Span::styled("Pages / ", Theme::dim()),
-                Span::styled(name.clone(), Theme::panel().fg(theme::ACCENT).bold()),
-                Span::styled("   ", Theme::panel()),
-                Span::styled(" zoom ", Theme::badge(theme::ACCENT)),
-                Span::styled(
-                    format!("  {} blocks · {} refs", app.rows.len(), app.linked.iter().map(|(_, v)| v.len()).sum::<usize>()),
-                    Theme::dim(),
-                ),
-            ]));
-            header.push(Line::from(Span::styled(
-                "─".repeat(inner.width as usize),
-                Theme::faint(),
-            )));
-        }
-        _ => {}
-    }
+    // No header strip: the pane's own title carries the page identity, and a
+    // second copy of the date plus a TODAY badge was the top bar's redundancy
+    // wearing a different hat.
+    let header: Vec<Line> = Vec::new();
 
     let body_height = inner.height.saturating_sub(header.len() as u16) as usize;
     let width = inner.width as usize;
@@ -1239,37 +971,52 @@ fn render_popup(f: &mut Frame, app: &App, x: u16, y: u16, bounds: Rect) {
     );
 }
 
+/// `Ctrl-P` — Find. With no query it is "what I touched last"; with a query it
+/// is a search across page names and block text. This is the navigation.
 fn render_palette(f: &mut Frame, app: &App, p: &crate::app::Palette, bounds: Rect) {
     let _ = app;
-    let width = 72u16.min(bounds.width.saturating_sub(8));
-    let height = ((p.filtered.len() as u16) + 4)
-        .clamp(7, 16)
-        .min(bounds.height.saturating_sub(4));
+    let width = 78u16.min(bounds.width.saturating_sub(6));
+    let height = ((p.items.len() as u16) + 4)
+        .clamp(7, 20)
+        .min(bounds.height.saturating_sub(3));
     let rect = Rect {
         x: bounds.x + (bounds.width.saturating_sub(width)) / 2,
-        y: bounds.y + (bounds.height.saturating_sub(height)) / 3,
+        y: bounds.y + (bounds.height.saturating_sub(height)) / 4,
         width,
         height,
     };
     f.render_widget(Clear, rect);
+    let hint = if p.recent { "recent" } else { "matches" };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Theme::popup_border())
         .style(Theme::overlay())
         .title(Line::from(vec![
-            Span::styled(" Command palette ", Theme::section_focus()),
-            Span::styled(" Ctrl-P ", Theme::faint()),
+            Span::styled(" Find ", Theme::section_focus()),
+            Span::styled(format!(" {} ", hint), Theme::faint()),
         ]));
     let inner = block.inner(rect);
     f.render_widget(block, rect);
 
     let rows = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(inner);
+    let prompt = if p.query.is_empty() {
+        "type to search page names and block text".to_string()
+    } else {
+        p.query.clone()
+    };
     f.render_widget(
         Paragraph::new(vec![
             Line::from(vec![
                 Span::styled("› ", Style::default().fg(theme::ACCENT).bg(theme::PANEL_ALT).bold()),
-                Span::styled(p.query.clone(), Theme::overlay()),
+                Span::styled(
+                    prompt,
+                    if p.query.is_empty() {
+                        Theme::overlay().fg(theme::FAINT)
+                    } else {
+                        Theme::overlay()
+                    },
+                ),
                 Span::styled("▏", Style::default().fg(theme::CARET).bg(theme::PANEL_ALT)),
             ]),
             Line::from(Span::styled(
@@ -1281,9 +1028,20 @@ fn render_palette(f: &mut Frame, app: &App, p: &crate::app::Palette, bounds: Rec
         rows[0],
     );
 
+    if p.items.is_empty() {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "  nothing matches — Esc to go back",
+                Style::default().fg(theme::FAINT).bg(theme::PANEL_ALT),
+            )))
+            .style(Theme::overlay()),
+            rows[1],
+        );
+        return;
+    }
+
     let mut lines: Vec<Line> = Vec::new();
-    for (n, idx) in p.filtered.iter().take(rows[1].height as usize).enumerate() {
-        let (label, detail, _) = &p.all[*idx];
+    for (n, item) in p.items.iter().take(rows[1].height as usize).enumerate() {
         let selected = n == p.selected;
         let bg = if selected {
             theme::SELECT_BG
@@ -1293,16 +1051,24 @@ fn render_palette(f: &mut Frame, app: &App, p: &crate::app::Palette, bounds: Rec
         let style = Style::default()
             .fg(if selected { theme::FG } else { theme::DIM })
             .bg(bg);
-        let label_max = 34usize;
-        let pad = " ".repeat(label_max.saturating_sub(label.chars().count().min(label_max)));
+        let label_max = 30usize;
+        let label: String = item.label.chars().take(label_max).collect();
+        let pad = " ".repeat(label_max.saturating_sub(label.chars().count()));
         lines.push(Line::from(vec![
-            Span::styled(if selected { "▸ " } else { "  " }, style),
+            Span::styled(if selected { " ▸ " } else { "   " }, style),
             Span::styled(
-                label.chars().take(label_max).collect::<String>(),
-                style.patch(Style::default().fg(if selected { theme::ACCENT } else { theme::DIM })),
+                label,
+                style.patch(Style::default().fg(if selected {
+                    theme::ACCENT
+                } else {
+                    theme::DIM
+                })),
             ),
             Span::styled(pad, style),
-            Span::styled(detail.clone(), style.patch(Style::default().fg(theme::FAINT))),
+            Span::styled(
+                truncate(&item.detail, inner.width.saturating_sub(label_max as u16 + 6) as usize),
+                style.patch(Style::default().fg(theme::FAINT)),
+            ),
         ]));
     }
     f.render_widget(
@@ -1724,16 +1490,14 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
 
 // -------------------------------------------------------------------- chrome
 
+/// One line: the mode (vim needs it), whether the caret is in a block, the
+/// pending vim prefix, and where you are in the outline. The page's identity is
+/// the pane title, so it is not repeated here.
 fn render_status(f: &mut Frame, app: &App, area: Rect) {
     let mode_color = match app.mode {
         Mode::Normal => theme::ACCENT,
         Mode::Insert => theme::GREEN,
         Mode::Visual => theme::PURPLE,
-    };
-    let focus = match app.focus {
-        Focus::Sidebar => "sidebar",
-        Focus::Main => "blocks",
-        Focus::Right => "references",
     };
     let mut spans = vec![
         Span::styled(
@@ -1743,7 +1507,7 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
         Span::styled(" ", Theme::statusbar()),
     ];
     if app.text_focus && app.mode == Mode::Normal {
-        // A cursor inside the block, not a mode: say so, and say how to leave.
+        // A cursor inside the block, not a mode: say so.
         spans.push(Span::styled(
             " in block ",
             Style::default().fg(theme::BG).bg(theme::CYAN).bold(),
@@ -1757,30 +1521,36 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
         ));
         spans.push(Span::styled(" ", Theme::statusbar()));
     }
-    if app.editor.is_some() {
-        spans.push(Span::styled(
-            "● editing  ",
-            Style::default().fg(theme::RED).bg(theme::PANEL_ALT).bold(),
-        ));
-    }
-    spans.push(Span::styled(format!("{}", focus), Theme::statusbar().fg(theme::FG)));
-    spans.push(Span::styled("  ·  ", Theme::statusbar().fg(theme::FAINT)));
     match &app.view {
-        View::Journal(day) => spans.push(Span::styled(
-            format!("{}  {} blocks", day.key(), app.rows.len()),
-            Theme::statusbar().fg(theme::DIM),
-        )),
-        View::Page(name) => spans.push(Span::styled(
-            format!("Pages/{}  {} blocks", name, app.rows.len()),
-            Theme::statusbar().fg(theme::DIM),
-        )),
+        View::Journal(_) | View::Page(_) => {
+            spans.push(Span::styled(
+                format!("{:>3}/{}", app.selected + 1, app.rows.len().max(1)),
+                Theme::statusbar().fg(theme::FG),
+            ));
+            if app.rows.iter().any(|r| r.depth > 0) {
+                let depth = app.selected_row().map(|r| r.depth).unwrap_or(0);
+                if depth > 0 {
+                    spans.push(Span::styled(
+                        format!("  depth {}", depth),
+                        Theme::statusbar().fg(theme::FAINT),
+                    ));
+                }
+            }
+        }
         View::Search => spans.push(Span::styled(
-            format!("\"{}\"  {} hits", app.search_query, app.search_results.len()),
+            format!("{} hits", app.search_results.len()),
             Theme::statusbar().fg(theme::DIM),
         )),
-        View::Query => spans.push(Span::styled("3 columns · live query", Theme::statusbar().fg(theme::DIM))),
+        View::Query => spans.push(Span::styled(
+            "TODO board",
+            Theme::statusbar().fg(theme::DIM),
+        )),
         View::Backup => spans.push(Span::styled(
-            format!("{} · {}", app.db.integrity_check(), human_bytes(app.db.stats.file_bytes)),
+            format!(
+                "{} · {}",
+                app.db.integrity_check(),
+                human_bytes(app.db.stats.file_bytes)
+            ),
             Theme::statusbar().fg(theme::DIM),
         )),
         View::Help => spans.push(Span::styled(
@@ -1796,36 +1566,23 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
             spans.push(Span::styled(msg, Theme::statusbar().fg(theme::DIM)));
         }
     }
-    if let Some(row) = app.selected_row() {
-        spans.push(Span::styled("  ·  ", Theme::statusbar().fg(theme::FAINT)));
-        spans.push(Span::styled(
-            format!("block #{}", row.id),
+    let left = Line::from(spans);
+
+    // Quiet on the right: no engine trivia, no WAL sizes, no snapshot nag. The
+    // one thing worth a chip is the pane you hid, so it is not a mystery.
+    let mut right_spans: Vec<Span> = Vec::new();
+    if !app.show_refs {
+        right_spans.push(Span::styled(
+            " references hidden · Ctrl-b ",
             Theme::statusbar().fg(theme::FAINT),
         ));
     }
-    let left = Line::from(spans);
-
-    // Deliberately quiet on the right: no engine trivia, no WAL sizes, no
-    // storage badges. That detail lives behind `:sql` and the storage screen.
+    // Quiet on the right: no engine trivia, no WAL sizes, no snapshot nag. The
+    // one thing worth a chip is a pane the user hid, so it is not a mystery.
     let mut right_spans: Vec<Span> = Vec::new();
-    if app.last_backup.is_none() {
+    if !app.show_refs {
         right_spans.push(Span::styled(
-            " no snapshot yet — :w ",
-            Style::default().fg(theme::BG).bg(theme::FAINT).bold(),
-        ));
-        right_spans.push(Span::styled(" ", Theme::statusbar()));
-    }
-    // Say what the outline is hiding, so a hidden panel is never a mystery.
-    if !app.show_sidebar || !app.show_refs {
-        let mut hidden = Vec::new();
-        if !app.show_sidebar {
-            hidden.push("sidebar");
-        }
-        if !app.show_refs {
-            hidden.push("refs");
-        }
-        right_spans.push(Span::styled(
-            format!(" {} hidden · Ctrl-n / Ctrl-b ", hidden.join(" + ")),
+            " references hidden · Ctrl-b ",
             Theme::statusbar().fg(theme::FAINT),
         ));
     }
@@ -1867,12 +1624,6 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
             ("Esc".into(), "leave".into()),
         ],
         Mode::Normal => match app.focus {
-            Focus::Sidebar => vec![
-                ("j/k".into(), "pages and journals".into()),
-                ("⏎".into(), "open".into()),
-                ("Ctrl-P".into(), "open any page".into()),
-                ("Esc".into(), "back to the blocks".into()),
-            ],
             Focus::Right => vec![
                 ("j/k".into(), "references".into()),
                 ("⏎".into(), "open the referencing block".into()),
@@ -1906,12 +1657,15 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                         ("o".into(), "new block".into()),
                         ("h/l".into(), "parent / children".into()),
                         ("za".into(), "fold".into()),
-                        ("Ctrl-P".into(), "open page".into()),
-                        ("Ctrl-w h".into(), "pages panel".into()),
+                        ("Ctrl-P".into(), "Find any page".into()),
+                        ("[ ]".into(), "prev / next day".into()),
                         ("/".into(), "search".into()),
                         (":".into(), "commands".into()),
                         ("?".into(), "all keys".into()),
                     ]);
+                    if !app.show_refs {
+                        v.insert(0, ("Ctrl-b".into(), "show references".into()));
+                    }
                     v
                 }
                 View::Search => vec![

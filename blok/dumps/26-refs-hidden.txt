@@ -1,7 +1,4 @@
- blok   Journal  ·  Thursday, October 8, 2026  TODAY                                           37 blocks · 12 pages · 11 refs  local  09:41
-╭ JOURNAL  Thursday, October 8, 2026 ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│Thursday, October 8, 2026   today   12 blocks                                                                                             │
-│──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
@@ -36,7 +33,10 @@
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ·  both panels hidden — the outline gets the whole width   Ctrl-n sidebar · Ctrl-b references · :set nosidebar
- NORMAL  blocks  ·  2026-10-08  12 blocks  ·  block #24                                              no snapshot yet — :w   sidebar + refs h
- Ctrl-] follow 1 link   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P open page   Ctrl-w h pag
+ ·  references hidden — the outline gets the whole width   Ctrl-b brings them back · :set norefs
+ NORMAL    4/12                                                                                                  references hidden · Ctrl-b
+ Ctrl-b show references   Ctrl-] follow 1 link   j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P

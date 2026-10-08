@@ -1,4 +1,3 @@
- blok   TODO board                                                                             37 blocks · 12 pages · 11 refs  local  09:41
 ╭ TODO  3 ─────────────────────────────────────╮╭ DOING  2 ──────────────────────────────────╮╭ DONE  1 ───────────────────────────────────╮
 │▌• Project…TODO Single-file export + import…  ││ • Project…DOING Snapshot uploader (rclon…  ││ • Project…DONE Conflict model: last-writ…  │
 │ • blok TUITODO Decide whether the TUI shou…  ││ • Today   DOING Write up the sync story …  ││                                            │
@@ -37,6 +36,7 @@
 │                                              ││                                            ││                                            │
 │                                              ││                                            ││                                            │
 │                                              ││                                            ││                                            │
+│                                              ││                                            ││                                            │
 ╰──────────────────────────────────────────────╯╰────────────────────────────────────────────╯╰────────────────────────────────────────────╯
- NORMAL  blocks  ·  3 columns · live query  ·  block #21                                                              no snapshot yet — :w
+ NORMAL  TODO board
  h/l columns   j/k rows   ⏎ jump to the block   Esc back

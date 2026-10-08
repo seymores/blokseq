@@ -558,7 +558,7 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
-            name: "13-command-palette",
+            name: "13-find-search",
             width: 118,
             height: 38,
             build: |app| {
@@ -718,18 +718,31 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
-            name: "26-panels-hidden",
+            name: "26-refs-hidden",
             width: 118,
             height: 38,
             build: |app| {
                 app.goto_today();
                 app.select_containing("Standup");
-                app.show_sidebar = false;
                 app.show_refs = false;
                 app.toast(
                     ToastKind::Info,
-                    "both panels hidden — the outline gets the whole width",
-                    Some("Ctrl-n sidebar · Ctrl-b references · :set nosidebar"),
+                    "references hidden — the outline gets the whole width",
+                    Some("Ctrl-b brings them back · :set norefs"),
+                );
+            },
+        },
+        Case {
+            name: "27-find-recent",
+            width: 118,
+            height: 38,
+            build: |app| {
+                app.goto_today();
+                app.open_palette();
+                app.toast(
+                    ToastKind::Info,
+                    "Ctrl-P with no query: what you touched last",
+                    Some("type to search page names and block text"),
                 );
             },
         },

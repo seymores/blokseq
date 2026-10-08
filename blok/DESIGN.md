@@ -65,7 +65,7 @@ rather than hiding it.
 | 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.5). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
-| 8 | **Panels are toggles, not furniture** | The sidebar and the references pane each hide on one key (`Ctrl-n`, `Ctrl-b`) or one `:set`, persist in `settings`, and hand their width back to the outline. Hiding them is the user's decision — never a side effect of the window being 79 columns wide. |
+| 8 | **One panel, one toggle, and no page tree** | The references pane hides on `Ctrl-b` or `:set norefs` and persists in `settings`. The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. |
 | 9 | **The engine stays off the screen until it is needed** | No WAL sizes, no engine badges, no snapshot chips in the corners. Schema and journal inspection live behind `:sql`, a read-only console (§6.6). |
 | 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. |
 | 11 | **Messages are messages, not windows** | The last action prints on one line above the status bar and any keypress clears it. No floating boxes: a dialog in the corner of an outliner is a riddle, not a feature. |
@@ -201,11 +201,11 @@ Two frames show the two halves of this:
 | ![First keystroke](dumps/png/02-journal-first-keystroke.png) | ![Journal](dumps/png/01-journal.png) |
 
 Note the title bar: `PROVISIONAL` on the left frame disappears on the right, and
-the sidebar entry stops being an outline circle. The storage screen shows the
+the ghost block is the whole story. The storage screen shows the
 prune pass with the days it dropped (`dumps/png/17-prune-empty-journals.png`).
 
 **Design consequence worth stating:** because empties never persist, "yesterday"
-in the sidebar is a list of *written* days, not a calendar. A 40-day gap is four
+in Find is a list of *written* days, not a calendar. A 40-day gap is four
 lines, not forty.
 
 ---
@@ -273,20 +273,25 @@ Frames are 140×42 cells (the compact one is 80×24); the PNGs are rasterised at
 
 ![Journal](dumps/png/01-journal.png)
 
-* **Left (GRAPH):** today, then written journals (relative dates, block counts),
-  then pages ordered by inbound links. `●` = today, `○` = provisional, `▌` =
-  cursor. The footer is the graph census.
-* **Centre (JOURNAL):** breadcrumb strip, then the block tree with indent guides
-  (`│`), fold markers (`▾`/`▸` with a child count when collapsed), bullets, and
-  inline syntax: `[[links]]` in accent, `((refs))` in purple *resolved to a
-  snippet of the target*, `#tags` in green, `key:: value` cyan keys, `TODO`/
-  `DOING`/`DONE` badges, `` `code` `` on a raised background, `**bold**`.
+There is **no top bar and no page sidebar**. Both were removed after using the
+thing: the top bar repeated the pane title, the date, a `TODAY` badge and four
+counters that nobody navigated by, and the sidebar was a page tree that made you
+find a pane before you could go anywhere. What is left is the outline, its title,
+and one status line.
+
+* **The pane title is the context:** `2026-10-08  today · 12 blocks`, or a page
+  name, or `2026-10-09 · provisional` for a day that has not been written to.
+* **The outline:** indent guides (`│`), fold markers (`▾`/`▸` with a child count
+  when collapsed), bullets, and inline syntax: `[[links]]` in accent, `((refs))`
+  in purple *resolved to a snippet of the target*, `#tags` in green, `key:: value`
+  cyan keys, `TODO`/`DOING`/`DONE` badges, `` `code` `` on a raised background,
+  `**bold**`, and `↗N` on any block that contains links.
 * **Right (LINKED REFERENCES):** backlinks grouped by source page (journals by
   relative date), plus an **unlinked references** section — plain-text mentions of
   the page title that are not yet linked, which is one of Logseq's best
-  affordances and costs one query.
-* **Bottom:** mode chip, focus, view, block counts, selected block id + uuid,
-  storage mode, snapshot state, then a context-sensitive hint bar.
+  affordances and costs one query. Toggle with `Ctrl-b`.
+* **Bottom:** mode chip, caret state, pending operator, and the cursor's position
+  in the outline (`5/12`), then the contextual hint bar.
 
 ### 6.2 Page view and links
 
@@ -294,11 +299,10 @@ Frames are 140×42 cells (the compact one is 80×24); the PNGs are rasterised at
 |---|---|
 | ![Page](dumps/png/11-page-view.png) | ![Refs](dumps/png/12-linked-references.png) |
 
-Pages get a breadcrumb (`Pages / Project Aurora`), a `zoom` chip, and the same
-outliner. `h`/`l` move focus between sidebar → blocks → references; the focused
-pane's border and section title change colour, and the selected reference gets a
-`▸` marker (selection is never carried by colour alone — it has to survive a
-monochrome terminal).
+The same outliner, titled with the page name. `Ctrl-w l` focuses the references
+pane; the focused pane's border and section title change colour, and the selected
+reference gets a `▸` marker (selection is never carried by colour alone — it has
+to survive a monochrome terminal).
 
 ### 6.3 Slash commands, page links, block refs
 
@@ -327,15 +331,15 @@ the "query" costs nothing.
 |---|---|
 | ![Storage](dumps/png/17-prune-empty-journals.png) | ![Help](dumps/png/18-help-keymap.png) |
 
-### 6.5 Command palette, and 80×24
+### 6.5 Find, and 80×24
 
 | Palette | Compact |
 |---|---|
-| ![Palette](dumps/png/13-command-palette.png) | ![Narrow](dumps/png/19-narrow-80x24.png) |
+| ![Find, searching](dumps/png/13-find-search.png) | ![Narrow](dumps/png/19-narrow-80x24.png) |
 
-At 80 columns the references pane is dropped (not squeezed), the sidebar narrows,
-the title bar goes compact, and the hint bar truncates — the same code path, no
-separate "small screen" mode.
+At 80 columns the references pane steps aside (not squeezed) and the hint bar
+truncates — the same code path, no separate "small screen" mode. The outline is
+the whole window at every width, which is the point of deleting the chrome.
 
 ### 6.6 Navigation, panels, and where the internals went
 
@@ -375,19 +379,21 @@ missing, a snapshot did not upload, or the schema is not what you think.
 
 ![SQL console: .tables](dumps/png/25-sql-tables.png)
 
-**Hidden panels.** `Ctrl-n` and `Ctrl-b`, or `:set nosidebar` / `:set norefs`,
-both persisted in `settings`. The status bar says what is hidden, so a missing
-pane is never a mystery, and the outline takes the width back. (The subtler bug
-here: at 79 columns the sidebar was dropped *even when it was "shown"*, so
-`Ctrl-w h` focused a pane that was not on screen.)
+**Hidden references.** `Ctrl-b`, or `:set norefs`, persisted in `settings`. The
+status bar says so, so a missing pane is never a mystery.
 
-![Both panels hidden](dumps/png/26-panels-hidden.png)
+![References hidden](dumps/png/26-refs-hidden.png)
 
-**Getting to another page** does not require the sidebar at all. `Ctrl-P` is a
-page/journal picker — filter as you type, `⏎` opens — and `Ctrl-w h` focuses the
-panel when that is what you want.
+**Find** (`Ctrl-P`) is the navigation. With no query it lists what you touched
+last — journals by relative date, pages by recency, each with its most recent
+block as a preview — so "the thing I was writing yesterday" is two keys away.
+Type and it becomes a search across page **names** and block **text**; a content
+hit says `matched in a block: …` so you can see why it matched, and `⏎` lands on
+that block rather than on the top of the page.
 
-![Page picker](dumps/png/13-command-palette.png)
+![Find: recent](dumps/png/27-find-recent.png)
+
+![Find: searching](dumps/png/13-find-search.png)
 
 **Messages, not dialogs.** The previous revision drew the last action in a
 floating box in the bottom-right corner, titled `sqlite`, which read as a
@@ -575,7 +581,7 @@ vim's grammar is made visible rather than assumed.
 | `>` `<` `d` `y` `J` `K` | indent, delete, yank, reorder the selection (VISUAL) |
 | `:` | ex command line, Tab-completed |
 | `/` `n` `N` | search the graph · next · previous match |
-| `Ctrl-n` `Ctrl-b` | show / hide the sidebar · the linked references |
+| `Ctrl-b` | show / hide the linked references |
 | `Ctrl-S` | snapshot, then the storage screen |
 | `q` `ZZ` `ZQ` `:q` | quit · snapshot-and-quit · quit without pruning · quit |
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
@@ -588,7 +594,7 @@ vim's grammar is made visible rather than assumed.
   a line, because moving down a line is already `j` (a line is a block).
 * `J` joins a block with the block below, which is vim's `J` with blocks as lines.
 * `?` opens the keymap instead of searching backwards; `/` + `N` covers that.
-* Page-level things that vim does not have (`[`/`]`, `Ctrl-n`, `Ctrl-b`, the
+* Page-level things that vim does not have (`[`/`]`, `Ctrl-b`, `Ctrl-P`, the
   views) are bound to keys vim leaves alone, and everything else is a `:` command
   rather than a new letter.
 
@@ -650,7 +656,7 @@ permanent furniture to toggles (§2, decisions 8-9).
 | 12 | Namespaces (`parent/child`) | `[[a/b]]` stores as a flat name; no parent tree, no namespace rendering | **roadmap** |
 | 13 | Refactoring and block manipulation | Keyboard equivalent of drag: indent/outdent (fractional index, one row), Alt-↑/↓ reorder, visual multi-select; no mouse | **built** (keyboard) |
 | 14 | PDF annotation built in | — | **dropped** |
-| 15 | Plugin ecosystem and marketplace | Command palette + stable uuid handles as the extension seam; no plugin runtime | **roadmap** |
+| 15 | Plugin ecosystem and marketplace | Find + stable uuid handles as the extension seam; no plugin runtime | **roadmap** |
 | 16 | Publishing a graph | `--export html` is on the roadmap (§12) | **roadmap** |
 | 17 | Sync, self-managed or official | Snapshot + remote copy (single writer); no client-side encryption, no multi-writer merge | **partial** |
 | 18 | Aliases | `alias::` → extra `refs` rows is a small, well-defined next step | **roadmap** |
@@ -687,18 +693,18 @@ Being explicit about this matters more than the demo looking good.
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
-  links; `Ctrl-P` opens a filtered page; `Ctrl-w h` reaches the sidebar and `⏎`
-  opens from it; panel toggles persist; a message clears on the next keypress;
+  links; `Ctrl-P` opens Find, searches block text, and lands on the matching
+  block; the references toggle persists; a message clears on the next keypress;
   the console refuses a `DELETE`.
-* All 28 frames in this document are the app's own renderer.
+* All 29 frames in this document are the app's own renderer.
 
 **Mocked or stubbed (and flagged as such):**
 
 * **The remote upload** writes the descriptor file an uploader would consume
   (`snapshots/queue/*.upload.json`); it does not talk to Dropbox. Wiring
   `rclone` into it is a small, boring change.
-* **The graph census** in the sidebar footer is counts, not a force-directed
-  drawing.
+* **The graph census** (counts, not a force-directed drawing) went with the
+  sidebar; `:sql` covers it for now.
 * **`PRAGMA integrity_check`** is real, but the "restore" button is a documented
   `cp` — there is no restore UI yet.
 * **Undo** covers text/create/delete, redo works, and a delete carries its whole

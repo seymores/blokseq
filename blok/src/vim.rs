@@ -337,27 +337,6 @@ impl App {
 
     // -------------------------------------------------------------- panels
 
-    pub fn toggle_sidebar(&mut self) {
-        self.show_sidebar = !self.show_sidebar;
-        self.db.set_setting(
-            "show_sidebar",
-            if self.show_sidebar { "true" } else { "false" },
-        );
-        if !self.show_sidebar && self.focus == Focus::Sidebar {
-            self.focus = Focus::Main;
-        }
-        let shown = self.show_sidebar;
-        self.toast(
-            ToastKind::Info,
-            if shown {
-                "sidebar shown"
-            } else {
-                "sidebar hidden — the outline gets the width"
-            },
-            Some("Ctrl-n toggles · :set sidebar / nosidebar"),
-        );
-    }
-
     pub fn toggle_refs(&mut self) {
         self.show_refs = !self.show_refs;
         self.db
@@ -376,14 +355,6 @@ impl App {
         );
     }
 
-    pub fn focus_left(&mut self) {
-        self.focus = if self.focus == Focus::Main && self.show_sidebar {
-            Focus::Sidebar
-        } else {
-            Focus::Main
-        };
-    }
-
     pub fn focus_right(&mut self) {
         self.focus = if self.focus == Focus::Main && self.show_refs {
             Focus::Right
@@ -395,7 +366,6 @@ impl App {
     pub fn focus_cycle(&mut self) {
         self.focus = match self.focus {
             Focus::Main if self.show_refs => Focus::Right,
-            Focus::Main if self.show_sidebar => Focus::Sidebar,
             _ => Focus::Main,
         };
     }
@@ -776,18 +746,12 @@ impl App {
             }
             "set" => {
                 match arg.as_str() {
-                    "sidebar" if !self.show_sidebar => self.toggle_sidebar(),
-                    "nosidebar" if self.show_sidebar => self.toggle_sidebar(),
                     "refs" if !self.show_refs => self.toggle_refs(),
                     "norefs" if self.show_refs => self.toggle_refs(),
-                    "sidebar" | "nosidebar" | "refs" | "norefs" => {
+                    "refs" | "norefs" => {
                         self.toast(ToastKind::Info, "already set that way", None)
                     }
-                    _ => self.toast(
-                        ToastKind::Warn,
-                        "set: sidebar · nosidebar · refs · norefs",
-                        None,
-                    ),
+                    _ => self.toast(ToastKind::Warn, "set: refs · norefs", None),
                 }
                 true
             }
@@ -1159,35 +1123,6 @@ impl App {
     /// Returns true when the key was consumed.
     pub fn tree_command(&mut self, seq: &str) -> bool {
         // Focus decides what the same keys mean, exactly like vim windows.
-        if self.focus == Focus::Sidebar {
-            match seq {
-                "j" => {
-                    self.sidebar_step(1);
-                    return true;
-                }
-                "k" => {
-                    self.sidebar_step(-1);
-                    return true;
-                }
-                "<CR>" => {
-                    let target = self
-                        .sidebar
-                        .get(self.sidebar_selected)
-                        .and_then(|i| i.view.clone());
-                    if let Some(v) = target {
-                        self.push_history();
-                        self.set_view(v);
-                        self.focus = Focus::Main;
-                    }
-                    return true;
-                }
-                "q" | "<Esc>" | "h" => {
-                    self.focus = Focus::Main;
-                    return true;
-                }
-                _ => {}
-            }
-        }
         if self.focus == Focus::Right {
             match seq {
                 "j" => {
@@ -1257,8 +1192,9 @@ impl App {
             "G" => self.jump(true),
             "C-d" => self.move_selection(12),
             "C-u" => self.move_selection(-12),
-            "C-n" => self.toggle_sidebar(),
             "C-b" => self.toggle_refs(),
+            // Ctrl-P is the navigation: "Find" is everything the sidebar and
+            // the page tree used to be, minus the pane you had to find first.
             "C-p" => self.open_palette(),
             "C-r" => self.redo(),
             "C-]" => self.follow_link(),
@@ -1269,9 +1205,7 @@ impl App {
                 self.do_backup();
                 self.set_view(View::Backup);
             }
-            "C-wh" => self.focus_left(),
-            "C-wl" => self.focus_right(),
-            "C-ww" => self.focus_cycle(),
+            "C-wl" | "C-ww" => self.focus_right(),
             "u" => self.undo(),
             "dd" | "x" => self.delete_selected(),
             "yy" | "Y" => self.yank_selected(),
@@ -1575,31 +1509,71 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_p_opens_any_page() {
-        let mut a = app("page_picker");
+    fn find_is_the_navigation() {
+        let mut a = app("find_pages");
         ctrl(&mut a, 'p');
-        assert!(a.palette.is_some(), "Ctrl-P opens the page picker");
-        // typing filters
+        {
+            let p = a.palette.as_ref().expect("Ctrl-P opens Find");
+            assert!(p.recent, "with no query it lists what you touched last");
+            assert!(!p.items.is_empty(), "and that list is not empty");
+        }
         for c in "Test".chars() {
             key(&mut a, c);
         }
-        let filtered = a.palette.as_ref().map(|p| p.filtered.len()).unwrap_or(0);
-        assert!(filtered >= 1, "the query filters the list");
+        {
+            let p = a.palette.as_ref().unwrap();
+            assert!(!p.recent, "a query switches from recent to matches");
+            assert!(
+                p.items.iter().any(|i| i.label.contains("Test Page")),
+                "the matching page is listed"
+            );
+        }
         code(&mut a, KeyCode::Enter);
         assert_eq!(a.view, View::Page("Test Page".into()));
     }
 
     #[test]
-    fn ctrl_w_h_reaches_the_sidebar_and_enter_opens() {
-        let mut a = app("sidebar_focus");
-        assert!(a.show_sidebar);
-        ctrl(&mut a, 'w');
-        key(&mut a, 'h');
-        assert_eq!(a.focus, Focus::Sidebar, "Ctrl-w h focuses the pages panel");
-        // j/k move the selection, Enter opens whatever is selected
-        key(&mut a, 'j');
+    fn find_matches_block_text_and_lands_on_the_block() {
+        let mut a = app("find_content");
+        // "second block" appears only inside a block, never in a page name.
+        ctrl(&mut a, 'p');
+        for c in "second".chars() {
+            key(&mut a, c);
+        }
+        {
+            let p = a.palette.as_ref().unwrap();
+            let hit = p
+                .items
+                .iter()
+                .find(|i| i.label.contains("Test Page"))
+                .expect("a content match still surfaces the page");
+            assert!(
+                hit.detail.contains("matched in a block"),
+                "and says why it matched: {}",
+                hit.detail
+            );
+        }
         code(&mut a, KeyCode::Enter);
-        assert_eq!(a.focus, Focus::Main, "Enter returns to the blocks");
+        assert_eq!(a.view, View::Page("Test Page".into()));
+        let selected = a
+            .selected_row()
+            .map(|r| r.content.clone())
+            .unwrap_or_default();
+        assert!(
+            selected.contains("second block"),
+            "Enter lands on the matching block, not just the page: {selected:?}"
+        );
+    }
+
+    #[test]
+    fn ctrl_w_l_reaches_the_references_pane() {
+        let mut a = app("refs_focus");
+        assert!(a.show_refs);
+        ctrl(&mut a, 'w');
+        key(&mut a, 'l');
+        assert_eq!(a.focus, Focus::Right, "Ctrl-w l focuses the references");
+        code(&mut a, KeyCode::Esc);
+        assert_eq!(a.focus, Focus::Main, "Esc goes back to the blocks");
     }
 
     #[test]
@@ -1645,13 +1619,11 @@ mod tests {
     }
 
     #[test]
-    fn panels_toggle_and_persist() {
+    fn refs_toggle_and_persist() {
         let mut a = app("panels");
-        assert!(a.show_sidebar && a.show_refs);
-        ctrl(&mut a, 'n');
+        assert!(a.show_refs);
         ctrl(&mut a, 'b');
-        assert!(!a.show_sidebar && !a.show_refs);
-        assert_eq!(a.db.get_setting("show_sidebar").as_deref(), Some("false"));
+        assert!(!a.show_refs);
         assert_eq!(a.db.get_setting("show_refs").as_deref(), Some("false"));
     }
 

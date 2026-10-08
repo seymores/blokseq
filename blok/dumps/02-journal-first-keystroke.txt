@@ -1,42 +1,42 @@
- blok   Journal  ·  Thursday, October 8, 2026  TODAY   PROVISIONAL                              25 blocks · 11 pages · 3 refs  local  09:41
-╭ GRAPH  11 ───────────────╮╭ JOURNAL  Thursday, October 8, 2026 ────────────────────────────────────────╮╭ LINKED REFERENCES  0 ──────────╮
-│TODAY                     ││Thursday, October 8, 2026   today   0 blocks  ·  not in the database yet    ││no links yet                    │
-│● Thursday, October 8, …  ││────────────────────────────────────────────────────────────────────────────││                                │
-│                          ││▌• Woke up thinking about the sync story▏                                   ││create one with [[page]] or ((bl│
-│JOURNALS                  ││                                                                            ││────────────────────────────────│
-│  Yesterday     Wed 07 · 2││   the first keystroke is what creates this day                             ││UNLINKED (mentions of this title│
-│  2d ago        Tue 06 · 1││                                                                            ││· none                          │
-│  3d ago        Mon 05 · 2││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│PAGES                     ││                                                                            ││                                │
-│  Project Aurora  1↗ · 11b││                                                                            ││                                │
-│  Terminal UX      1↗ · 1b││                                                                            ││                                │
-│  sync             1↗ · 0b││                                                                            ││                                │
-│  Reading list          1b││                                                                            ││                                │
-│  SQLite                1b││                                                                            ││                                │
-│  Weekly review         1b││                                                                            ││                                │
-│  blok                  0b││                                                                            ││                                │
-│  blok TUI              5b││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│                          ││                                                                            ││                                │
-│──────────────────────────││                                                                            ││                                │
-│graph  3 journals · 11 pag││                                                                            ││                                │
-╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
- INSERT  ● editing  blocks  ·  2026-10-08  0 blocks                                                                   no snapshot yet — :w
+╭ 2026-10-08 · provisional  today · 0 blocks ──────────────────────────────────────────────────────╮╭ LINKED REFERENCES  0 ────────────────╮
+│▌• Woke up thinking about the sync story▏                                                         ││no links yet                          │
+│                                                                                                  ││                                      │
+│   the first keystroke is what creates this day                                                   ││create one with [[page]] or ((block)) │
+│                                                                                                  ││──────────────────────────────────────│
+│                                                                                                  ││UNLINKED (mentions of this title)     │
+│                                                                                                  ││· none                                │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+│                                                                                                  ││                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
+ INSERT    1/1
  Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
