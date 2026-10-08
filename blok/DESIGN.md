@@ -314,7 +314,16 @@ never carried by colour alone — it has to survive a monochrome terminal).
 | ![Slash](dumps/png/04-slash-commands.png) | ![Page](dumps/png/05-page-autocomplete.png) | ![Block](dumps/png/06-block-ref.png) |
 
 All three popups are anchored to the caret, open on the trigger character, fuzzy-
-filter as you type, and accept with Tab/Enter. Block refs show the *resolved
+filter as you type, and accept with Tab/Enter.
+
+There is a fourth list, and it is not one of these three: `Ctrl-]` on a block with
+several links opens the destinations already *in* that block. It is a menu rather
+than a text field — typing filters it and never touches the block — and Enter
+follows the selected link, which is navigation, so `[` (or `Ctrl-o`) comes back to
+where you were. It took two reports to get here: Enter on a chosen link went
+nowhere, because the chooser's only ever exercised path was the single-link jump;
+and typing in it used to insert the characters into the block and then close the
+menu, which is a strange thing for a menu to do to a document. Block refs show the *resolved
 snippet* of the candidate, so `((` is a search over your own writing rather than
 a uuid-paste exercise. In the outliner, a rendered block ref shows
 `((↗ snippet…))`: the uuid is never displayed unless you ask for it.
@@ -855,7 +864,12 @@ Being explicit about this matters more than the demo looking good.
   `fencing_a_block_removes_the_refs_it_had` (the fence's contract), plus
   `a_code_block_renders_its_body_under_a_badge` and the `Editor` unit tests for
   `indent`/`dedent`/`position`.
-* The key router is covered by 57 regression tests (`cargo test`), one per bug
+* The link chooser has two: `the_link_chooser_follows_the_link_you_pick` (Enter
+  follows, Down selects the other, and `[` comes back) and
+  `typing_in_the_link_chooser_filters_and_leaves_the_block_alone`. Both exist
+  because the chooser only appears with two or more links in a block and every
+  earlier test had one.
+* The key router is covered by 59 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -863,7 +877,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 31 frames in this document are the app's own renderer (31 frames, 57
+* All 31 frames in this document are the app's own renderer (31 frames, 59
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

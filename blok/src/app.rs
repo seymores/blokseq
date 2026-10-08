@@ -927,7 +927,12 @@ impl App {
             Trigger::Link => {
                 // The `Ctrl-]` menu: the destinations already in this block.
                 for l in self.link_menu.clone() {
-                    push(l.label.clone(), l.kind.to_string(), "link");
+                    let detail = match (&l.page, l.block) {
+                        (Some(p), Some(b)) => format!("{} · {} · block #{}", l.kind, p, b),
+                        (Some(p), None) => format!("{} · {}", l.kind, p),
+                        _ => l.kind.to_string(),
+                    };
+                    push(l.label.clone(), detail, "link");
                 }
             }
             Trigger::BlockRef => {
@@ -987,6 +992,24 @@ impl App {
         let Some(cand) = popup.candidates.get(popup.selected).cloned() else {
             return;
         };
+        // The `Ctrl-]` chooser is the one popup that *navigates* rather than
+        // writing text: its candidates are the labels in `link_menu`, so the
+        // target is resolved from there. Until this existed, Enter on a chosen
+        // link closed the menu and went nowhere -- and since the chooser only
+        // appears when a block has two or more links, the single-link path's
+        // test never saw it.
+        if popup.trigger == Trigger::Link {
+            self.popup = None;
+            if let Some(target) = self
+                .link_menu
+                .iter()
+                .find(|l| l.label == cand.label)
+                .cloned()
+            {
+                self.jump_to(&target);
+            }
+            return;
+        }
         // Most slash commands are literal text (`TODO`, a `key:: value`).
         // `Code` is the exception: what it inserts is a *fence*, because the
         // fence is the markup that makes the block code.
@@ -1015,6 +1038,42 @@ impl App {
             }
         }
         self.popup = None;
+    }
+
+    /// Open the `Ctrl-]` chooser for a block with several links. Rebuilding the
+    /// candidates from `link_menu` (rather than carrying them around) is what
+    /// lets the list be filtered without a second copy of the links.
+    pub fn open_link_menu(&mut self, links: Vec<LinkTarget>) {
+        self.link_menu = links;
+        self.popup = Some(PopupState {
+            trigger: Trigger::Link,
+            query: String::new(),
+            selected: 0,
+            candidates: self.candidates_for(Trigger::Link, ""),
+        });
+    }
+
+    /// Type in the chooser: filter the list, and leave the block alone.
+    fn link_menu_input(&mut self, c: Option<char>) {
+        if let Some(p) = self.popup.as_mut() {
+            match c {
+                Some(c) => p.query.push(c),
+                None => {
+                    p.query.pop();
+                }
+            }
+            p.selected = 0;
+        }
+        let query = self
+            .popup
+            .as_ref()
+            .map(|p| p.query.clone())
+            .unwrap_or_default();
+        let candidates = self.candidates_for(Trigger::Link, &query);
+        if let Some(p) = self.popup.as_mut() {
+            p.selected = p.selected.min(candidates.len().saturating_sub(1));
+            p.candidates = candidates;
+        }
     }
 
     pub fn popup_move(&mut self, delta: i64) {
@@ -1250,11 +1309,21 @@ impl App {
         }
 
         if self.popup.is_some() {
+            let popup_is_link = self
+                .popup
+                .as_ref()
+                .map(|p| p.trigger == Trigger::Link)
+                .unwrap_or(false);
             match k.code {
                 KeyCode::Esc => self.popup = None,
                 KeyCode::Enter | KeyCode::Tab => self.accept_popup(),
                 KeyCode::Up => self.popup_move(-1),
                 KeyCode::Down => self.popup_move(1),
+                // In the link chooser, printable keys filter the list. They used
+                // to be typed into the block and then close the popup, because
+                // this arm refrehed from the *editor's* trigger.
+                KeyCode::Char(c) if !ctrl && popup_is_link => self.link_menu_input(Some(c)),
+                KeyCode::Backspace if popup_is_link => self.link_menu_input(None),
                 KeyCode::Char(c) if !ctrl => {
                     if let Some(ed) = self.editor.as_mut() {
                         ed.insert_char(c);

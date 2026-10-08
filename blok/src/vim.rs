@@ -23,9 +23,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{
-    App, ExState, Focus, InsertAt, LinkTarget, PopupState, SqlConsole, ToastKind, View, EX_COMMANDS,
+    App, ExState, Focus, InsertAt, LinkTarget, SqlConsole, ToastKind, View, EX_COMMANDS,
 };
-use crate::editor::{Candidate, Mode, Trigger};
+use crate::editor::Mode;
 use crate::model::JournalDay;
 
 impl App {
@@ -499,25 +499,7 @@ impl App {
             ),
             1 => self.jump_to(&links[0]),
             _ => {
-                self.link_menu = links.clone();
-                self.popup = Some(PopupState {
-                    trigger: Trigger::Link,
-                    query: String::new(),
-                    selected: 0,
-                    candidates: links
-                        .iter()
-                        .map(|l| Candidate {
-                            label: l.label.clone(),
-                            detail: match (&l.page, l.block) {
-                                (Some(p), Some(b)) => format!("{} · {} · block #{}", l.kind, p, b),
-                                (Some(p), None) => format!("{} · {}", l.kind, p),
-                                _ => l.kind.to_string(),
-                            },
-                            kind: "link".into(),
-                            match_at: None,
-                        })
-                        .collect(),
-                });
+                self.open_link_menu(links.clone());
                 self.toast(
                     ToastKind::Info,
                     &format!("{} links — pick one", self.link_menu.len()),
@@ -1457,6 +1439,7 @@ pub fn key_name(k: KeyEvent, ctrl: bool) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::editor::Trigger;
     use crate::model::PageKind;
 
     /// One database per test: tests run in parallel threads of the same process,
@@ -1911,7 +1894,7 @@ mod tests {
     /// `key:: value` in a sample is not a property of yours.
     #[test]
     fn a_code_block_creates_no_refs_and_no_properties() {
-        let mut a = app("code_refs");
+        let a = app("code_refs");
         let page = a.db.ensure_page("Snippets", PageKind::Page);
         let code = "```c\n#include <stdio.h>\nchar *s = \"[[not a page]]\";\nid:: 7\n#not a tag\n```";
         a.db.create_block(page.id, None, None, code);
@@ -1939,7 +1922,7 @@ mod tests {
     /// interpret this".
     #[test]
     fn fencing_a_block_removes_the_refs_it_had() {
-        let mut a = app("code_cleanup");
+        let a = app("code_cleanup");
         let page = a.db.ensure_page("Cleanup", PageKind::Page);
         let b = a.db.create_block(page.id, None, None, "see [[Test Page]] and #atag");
         assert_eq!(a.db.page_meta(page.id).unwrap().refs_out, 2);
@@ -2171,5 +2154,123 @@ mod tests {
         code(&mut a, KeyCode::Esc);
         assert!(!a.text_focus);
         assert!(a.editor.is_none());
+    }
+
+    /// Report: with more than one link in a block, Enter on the chosen link did
+    /// nothing. The *single*-link path (`jump_to` directly) had a test; the
+    /// chooser, which only exists when there are two or more links, did not --
+    /// so nothing ever noticed that its Enter was wired to nothing.
+    #[test]
+    fn the_link_chooser_follows_the_link_you_pick() {
+        let mut a = app("link_chooser");
+        let page = a.db.ensure_page("Test Page", PageKind::Page);
+        let other = a.db.ensure_page("Other Page", PageKind::Page);
+        a.db.create_block(other.id, None, None, "elsewhere");
+        let b = a
+            .db
+            .create_block(
+                page.id,
+                None,
+                None,
+                "links: [[Other Page]] and [[Missing Page]]",
+            )
+            .id;
+        a.reload();
+        a.select_block(b);
+        assert_eq!(a.links_in(b).len(), 2, "this is the chooser's case");
+
+        ctrl(&mut a, ']');
+        {
+            let p = a.popup.as_ref().expect("two links: a chooser, not a jump");
+            assert_eq!(p.trigger, Trigger::Link);
+            assert_eq!(p.candidates.len(), 2);
+            assert_eq!(p.candidates[0].label, "[[Other Page]]", "the label is the syntax");
+            assert!(
+                p.candidates[0].detail.contains("Other Page"),
+                "the detail says where it goes: {}",
+                p.candidates[0].detail
+            );
+        }
+
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(
+            a.view,
+            View::Page("Other Page".into()),
+            "Enter follows the selected link"
+        );
+        assert!(a.popup.is_none());
+
+        // Following is navigation, so back comes here -- not to the top of the page.
+        key(&mut a, '[');
+        assert_eq!(a.view, View::Page("Test Page".into()));
+
+        // Down picks the other one, and a page that does not exist yet is still a
+        // destination.
+        ctrl(&mut a, ']');
+        code(&mut a, KeyCode::Down);
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.view, View::Page("Missing Page".into()));
+    }
+
+    /// The chooser is a menu, not a text field. Typing in it used to insert the
+    /// characters into the *block* and then close the popup, which is a strange
+    /// thing for a menu to do to your document.
+    #[test]
+    fn typing_in_the_link_chooser_filters_and_leaves_the_block_alone() {
+        let mut a = app("link_chooser_filter");
+        let page = a.db.ensure_page("Test Page", PageKind::Page);
+        let other = a.db.ensure_page("Other Page", PageKind::Page);
+        a.db.create_block(other.id, None, None, "elsewhere");
+        let b = a
+            .db
+            .create_block(page.id, None, None, "see [[Other Page]] and [[Test Page]]")
+            .id;
+        a.reload();
+        a.select_block(b);
+        // `Ctrl-]` is navigation, so it leaves the block's text first (a tree
+        // motion), which is why this opens the chooser with no editor. The hard
+        // case is a chooser open *while* a buffer is being edited, so set that
+        // up directly rather than relying on an obscure key sequence.
+        a.begin_edit_block(b);
+        a.open_link_menu(a.links_in(b));
+        let before = a.editor.as_ref().unwrap().text();
+
+        for c in "Other".chars() {
+            key(&mut a, c);
+        }
+        {
+            let p = a.popup.as_ref().expect("still a chooser");
+            assert_eq!(p.query, "Other");
+            assert_eq!(p.candidates.len(), 1, "the query filters the list");
+            assert_eq!(p.candidates[0].label, "[[Other Page]]");
+        }
+        assert_eq!(
+            a.editor.as_ref().unwrap().text(),
+            before,
+            "and the buffer is untouched: a menu does not type into your block"
+        );
+
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.view, View::Page("Other Page".into()));
+
+        // The same keys, reached the way a user reaches them: back to the page
+        // holding the block, open the chooser from the tree, filter, un-filter,
+        // and cancel.
+        key(&mut a, '[');
+        assert_eq!(a.view, View::Page("Test Page".into()));
+        ctrl(&mut a, ']');
+        assert_eq!(a.popup.as_ref().unwrap().candidates.len(), 2);
+        key(&mut a, 'o');
+        assert_eq!(a.popup.as_ref().unwrap().candidates.len(), 1, "'o' is in one");
+        code(&mut a, KeyCode::Backspace);
+        assert_eq!(a.popup.as_ref().unwrap().query, "");
+        assert_eq!(a.popup.as_ref().unwrap().candidates.len(), 2);
+        code(&mut a, KeyCode::Esc);
+        assert!(a.popup.is_none());
+        assert_eq!(
+            a.view,
+            View::Page("Test Page".into()),
+            "Esc cancels the chooser; it does not follow anything"
+        );
     }
 }
