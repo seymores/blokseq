@@ -528,6 +528,19 @@ impl Db {
         let _ = self
             .conn
             .execute("DELETE FROM properties WHERE block_id = ?1", params![block_id]);
+        // A code block is not prose. `#include`, `[[placeholder]]` inside a
+        // string and `key:: value` in a sample are all literal text, and the one
+        // thing a fence promises is that none of them become a page, a link or a
+        // property. The deletes above still ran, so turning a prose block into a
+        // code block also cleans up whatever it used to reference.
+        if crate::model::is_code(content) {
+            let _ = self.conn.execute(
+                "UPDATE blocks SET status = NULL WHERE id = ?1 AND status IN
+                   ('TODO','DOING','DONE','LATER','NOW','WAITING','CANCELED')",
+                params![block_id],
+            );
+            return;
+        }
         // A leading TODO/DOING/DONE marker becomes a typed column, so the board
         // and any query never have to look at text.
         let (marker, _rest) = crate::model::split_status(content);

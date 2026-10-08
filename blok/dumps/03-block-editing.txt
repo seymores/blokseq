@@ -1,5 +1,5 @@
 ╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│▌▾ Deep work 09▏:00–12:30 on the block store                                                                                              │
+│▌▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
 │ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    1/12                                                                                                              line 1, col 13
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag

@@ -870,6 +870,13 @@ impl App {
             self.popup = None;
             return;
         };
+        // Inside a code block there are no completions to offer: `/` is a slash,
+        // `#` is a preprocessor directive, and a menu appearing over `((` in a
+        // code sample is worse than useless.
+        if crate::model::is_code(&ed.text()) {
+            self.popup = None;
+            return;
+        }
         let Some((trigger, query)) = ed.trigger() else {
             self.popup = None;
             return;
@@ -980,7 +987,11 @@ impl App {
         let Some(cand) = popup.candidates.get(popup.selected).cloned() else {
             return;
         };
+        // Most slash commands are literal text (`TODO`, a `key:: value`).
+        // `Code` is the exception: what it inserts is a *fence*, because the
+        // fence is the markup that makes the block code.
         let value = match popup.trigger {
+            Trigger::Slash => slash_text(&cand.label),
             Trigger::PageLink => format!("[[{}]]", cand.label),
             Trigger::BlockRef => {
                 // resolve the snippet back to a uuid
@@ -997,6 +1008,11 @@ impl App {
         };
         if let Some(ed) = self.editor.as_mut() {
             ed.complete(popup.trigger, &value);
+            if popup.trigger == Trigger::Slash && cand.label == "Code" {
+                // The fence is markup: the caret belongs on the line between the
+                // fences, which is where the code goes.
+                ed.goto_line(1);
+            }
         }
         self.popup = None;
     }
@@ -1389,7 +1405,12 @@ impl App {
             }
             KeyCode::Tab => {
                 if let Some(ed) = self.editor.as_mut() {
-                    ed.insert_str("  ");
+                    ed.indent();
+                }
+            }
+            KeyCode::BackTab => {
+                if let Some(ed) = self.editor.as_mut() {
+                    ed.dedent();
                 }
             }
             KeyCode::Char(c) if !ctrl => {
@@ -1423,6 +1444,19 @@ pub fn snippet(text: &str, width: usize) -> String {
 }
 
 /// Slash commands, Logseq-flavoured.
+/// What a slash command writes into the block. `Code` opens a fence and leaves
+/// the caret inside it; everything else is the literal text of the command,
+/// which is honest for `TODO` and a stub for the rest (`Deadline` inserts its
+/// name, not a `DEADLINE::` property -- see the roadmap).
+pub fn slash_text(label: &str) -> String {
+    match label {
+        // An unterminated fence with a blank line to type into. The language is
+        // yours to add on the first line; a default would be a guess.
+        "Code" => "```\n\n```".to_string(),
+        other => other.to_string(),
+    }
+}
+
 pub const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("TODO", "mark this block as a task"),
     ("DOING", "in progress"),
@@ -1435,7 +1469,7 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("Query", "a saved query block"),
     ("Template", "insert a template"),
     ("Quote", "quote block"),
-    ("Code", "fenced code block"),
+    ("Code", "a code block: nothing inside is interpreted"),
     ("Page embed", "embed a whole page inline"),
     ("Block embed", "embed another block"),
     ("Cards", "make this block a flashcard"),

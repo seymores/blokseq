@@ -4,7 +4,7 @@
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
 │ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
 │ │ • Export format settled: the SQLite file *is* the format                                                                               │
-│▌│ ▾ Follow up next week with [[p▏                                                                                                        │
+│▌│ ▾ Follow up next week with [[p                                                                                                         │
 │ │ │ • deadline:: 2026-02-20     ╭ Link to page · [[p ────────────────────────────────╮                                                   │
 │       priority:: A              │▸ Project Aurora                 page  2 links · …  │                                                   │
 │ │ • DOING Write up the sync stor│ ↑↓ choose  Tab complete  Esc cancel                │                                                   │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    6/12  depth 1                                                                                                     line 1, col 29
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag

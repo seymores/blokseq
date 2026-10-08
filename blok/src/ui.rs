@@ -147,14 +147,18 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
                 day.relative(app.today)
             };
             Some(Span::styled(
-                format!(" {} · {} blocks ", when, app.rows.len()),
+                format!(" {} · {} ", when, count(app.rows.len(), "block")),
                 Theme::section().fg(theme::DIM),
             ))
         }
         View::Page(_) => {
             let refs: usize = app.linked.iter().map(|(_, v)| v.len()).sum();
             Some(Span::styled(
-                format!(" {} blocks · {} refs ", app.rows.len(), refs),
+                format!(
+                    " {} · {} ",
+                    count(app.rows.len(), "block"),
+                    count(refs, "ref")
+                ),
                 Theme::section().fg(theme::DIM),
             ))
         }
@@ -432,6 +436,12 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
     prefix.push(Span::styled(bullet, bullet_style));
 
     let prefix_w = prefix_width(&prefix);
+    // A code block is not prose, and the difference has to be settled before
+    // anything tries to interpret its text: no links, no tags, no properties,
+    // no word wrap.
+    if let Some(code) = crate::model::code_block(&row.content) {
+        return code_lines(&code, row, prefix, prefix_w, width, selected);
+    }
     // A block with links says so, so that "can I go somewhere from here?" is
     // answerable by looking. `Ctrl-]` / `gf` follows them.
     let links = crate::model::parse_refs(&row.content).len();
@@ -481,6 +491,131 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
     out
 }
 
+/// A code block in the read-only outline.
+///
+/// The fence is markup, so it is not shown: the *body* is, verbatim, under a
+/// `CODE · lang` badge. Nothing inside is interpreted, and the wrapping is by
+/// character rather than by word -- reflowing a program at its spaces turns one
+/// line into two and destroys the alignment that makes code readable.
+fn code_lines(
+    code: &crate::model::CodeBlock,
+    row: &Row,
+    prefix: Vec<Span<'static>>,
+    prefix_w: usize,
+    width: usize,
+    selected: bool,
+) -> Vec<Line<'static>> {
+    let bg = if selected {
+        theme::SELECT_BG
+    } else {
+        theme::PANEL_ALT
+    };
+    let text = Style::default().fg(theme::FG).bg(bg);
+    let badge = Style::default().fg(theme::CYAN).bg(bg);
+    let hang = " ".repeat(prefix_w);
+    let label = if code.lang.is_empty() {
+        "  CODE".to_string()
+    } else {
+        format!("  CODE · {}", code.lang)
+    };
+    let marker = if row.collapsed && row.has_children {
+        format!("  ▸ {} collapsed", row.child_count)
+    } else {
+        String::new()
+    };
+
+    let body = expand_tabs(&code.body);
+    let mut out: Vec<Line<'static>> = Vec::new();
+    for (i, line) in body.split('\n').enumerate() {
+        // The badge and the collapsed marker ride the first line, so its *first*
+        // chunk has less room than the rest of the line -- not the whole line:
+        // wrapping every chunk of a long first line at the badge's width would
+        // make the code look ragged for no reason.
+        let full = width.saturating_sub(prefix_w).max(4);
+        let first_w = if i == 0 {
+            full.saturating_sub(label.chars().count() + marker.chars().count()).max(4)
+        } else {
+            full
+        };
+        let mut chunks: Vec<String> = Vec::new();
+        if i == 0 && line.chars().count() > first_w {
+            let chars: Vec<char> = line.chars().collect();
+            chunks.push(chars[..first_w].iter().collect());
+            chunks.extend(chars[first_w..].chunks(full).map(|c| c.iter().collect()));
+        } else {
+            chunks = chunk_chars_hard(line, first_w);
+        }
+        for (j, chunk) in chunks.into_iter().enumerate() {
+            let mut spans: Vec<Span> = if i == 0 && j == 0 {
+                prefix.clone()
+            } else {
+                vec![Span::styled(hang.clone(), Style::default().bg(bg))]
+            };
+            spans.push(Span::styled(chunk, text));
+            if i == 0 && j == 0 {
+                spans.push(Span::styled(label.clone(), badge));
+                if !marker.is_empty() {
+                    spans.push(Span::styled(marker.clone(), Style::default().fg(theme::FAINT).bg(bg)));
+                }
+            }
+            out.push(Line::from(spans));
+        }
+    }
+    if out.is_empty() {
+        out.push(Line::from(prefix));
+    }
+    out
+}
+
+/// Hard character wrapping, for text with no spaces to break at and leading
+/// whitespace that is part of the content.
+fn chunk_chars_hard(s: &str, w: usize) -> Vec<String> {
+    let w = w.max(1);
+    let chars: Vec<char> = s.chars().collect();
+    if chars.is_empty() {
+        return vec![String::new()];
+    }
+    chars.chunks(w).map(|c| c.iter().collect()).collect()
+}
+
+/// A tab is indentation, so it renders as the editor's indent step rather than
+/// as a control character in the buffer.
+fn expand_tabs(s: &str) -> String {
+    s.replace('\t', &" ".repeat(crate::editor::INDENT))
+}
+
+/// Editing view of a code block. The fence *is* shown while you edit, because
+/// the fence is the markup and this app edits markup as text -- but nothing
+/// inside is interpreted, and the fence lines are coloured as delimiters so it
+/// is obvious which lines are not the program.
+fn code_styles(chars: &[char], bg: ratatui::style::Color) -> Vec<(char, Style)> {
+    let body = Style::default().fg(theme::FG).bg(bg);
+    let fence = Style::default()
+        .fg(theme::CYAN)
+        .bg(bg)
+        .add_modifier(Modifier::DIM);
+    let first_end = chars.iter().position(|c| *c == '\n').unwrap_or(chars.len());
+    let last_start = chars
+        .iter()
+        .rposition(|c| *c == '\n')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let closing = last_start > 0
+        && chars[last_start..].iter().collect::<String>().trim_end() == "```";
+    chars
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let st = if i < first_end || (closing && i >= last_start) {
+                fence
+            } else {
+                body
+            };
+            (*c, st)
+        })
+        .collect()
+}
+
 fn prefix_width(spans: &[Span]) -> usize {
     spans
         .iter()
@@ -515,7 +650,13 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
     let prefix_w = prefix_width(&prefix);
 
     let text: String = ed.chars.iter().collect();
-    let styled = styled_chars(app, &text, bg, true);
+    // While the block is code, nothing inside it is markup -- including while
+    // you type, which is also what stops `#include` from opening the tag menu.
+    let styled = if crate::model::is_code(&text) {
+        code_styles(&ed.chars, bg)
+    } else {
+        styled_chars(app, &text, bg, true)
+    };
     // Every line we emit has to fit the pane outright. The `Paragraph` wrapping
     // these lines uses word boundaries, so one cell of overflow does not clip --
     // it moves a whole word to the next display row and every row below it (and
@@ -555,7 +696,15 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
             at = Some(run.len());
         }
         if let Some(i) = at {
-            run.insert(i, ('▏', Theme::caret().bg(bg)));
+            // The caret is a style on a cell, not a character of its own. Past
+            // the last character there is no cell to style, so it gets a blank
+            // one -- which is why one cell of the wrap width is reserved for it.
+            if i < run.len() {
+                let (c, st) = run[i];
+                run[i] = (c, st.patch(Theme::caret_block()));
+            } else {
+                run.push((' ', Theme::caret_block()));
+            }
             caret = Some(((prefix_w + i) as u16, n as u16));
         }
         spans.extend(runs_to_spans(run));
@@ -1776,6 +1925,7 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
             ("Esc".into(), "stop editing".into()),
             ("⏎".into(), "new block".into()),
             ("Alt-⏎".into(), "newline in this block".into()),
+            ("Tab".into(), "indent".into()),
             ("/".into(), "commands".into()),
             ("[[".into(), "link page".into()),
             ("((".into(), "block ref".into()),
@@ -1800,6 +1950,7 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                     ("w b e 0 $".into(), "move".into()),
                     ("x dw cw".into(), "delete, change".into()),
                     ("⏎ i a".into(), "type".into()),
+                    ("Tab".into(), "indent".into()),
                     ("o".into(), "new block".into()),
                     ("Ctrl-]".into(), "follow link".into()),
                     ("Esc".into(), "drop the caret".into()),
@@ -1864,8 +2015,9 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
     };
     // The bar measures itself. Most relevant first, so when the row is too
     // narrow the tail is what goes -- except the last pair, which is pinned to
-    // the right edge. The last pair is always the pointer to `?`, and hiding the
-    // way to the manual is the one thing a truncated hint bar must not do.
+    // the right edge. In the outline that pair is the pointer to `?`, and hiding
+    // the way to the manual is the one thing a truncated hint bar must not do;
+    // every other hint set is short enough that the pinning never engages.
     let width_of = |(k, d): &(String, String)| 1 + k.chars().count() + 1 + d.chars().count() + 2;
     let pair_spans = |(k, d): &(String, String)| {
         vec![
@@ -2125,6 +2277,16 @@ fn render_sql(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(lines).style(Theme::panel()), out);
 }
 
+/// `1 block` / `2 blocks`: a pane title is a sentence, and the app should not
+/// say "1 blocks" about a page with one block in it.
+fn count(n: usize, thing: &str) -> String {
+    if n == 1 {
+        format!("1 {thing}")
+    } else {
+        format!("{n} {thing}s")
+    }
+}
+
 pub fn truncate(s: &str, w: usize) -> String {
     if s.chars().count() <= w {
         return s.to_string();
@@ -2164,6 +2326,11 @@ pub fn block_cursor_line(app: &App) -> Option<Line<'static>> {
 pub fn property_table(app: &App, page_id: i64) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for b in app.db.page_blocks(page_id) {
+        // A `key:: value` inside a code block is part of the program, not a
+        // property of the page.
+        if crate::model::is_code(&b.content) {
+            continue;
+        }
         for (k, v) in properties(&b.content) {
             out.push((k, v));
         }
@@ -2191,6 +2358,7 @@ mod render_tests {
     use crate::db::Db;
     use crate::editor::Editor;
     use crate::model::PageKind;
+    use crate::theme;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::backend::TestBackend;
     use ratatui::layout::Position;
@@ -2294,6 +2462,19 @@ mod render_tests {
         term.backend().buffer()[(x, y)].symbol().to_string()
     }
 
+    fn caret_bg(term: &Terminal<TestBackend>, x: u16, y: u16) -> ratatui::style::Color {
+        term.backend().buffer()[(x, y)].bg
+    }
+
+    /// The characters of one screen row, with the panel borders trimmed off.
+    fn row_text(term: &Terminal<TestBackend>, w: u16, y: u16) -> String {
+        (1..w - 1)
+            .map(|x| term.backend().buffer()[(x, y)].symbol())
+            .collect::<String>()
+            .trim_end()
+            .to_string()
+    }
+
     fn press(app: &mut App, c: char) {
         app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
     }
@@ -2330,13 +2511,49 @@ mod render_tests {
         let at = term.backend().cursor_position();
         // Pane border one column in, then the "▌" and the "• " bullet.
         assert_eq!(at, Position { x: 7, y: 1 });
-        assert_eq!(glyph_at(&term, at.x, at.y), "▏", "the glyph and the cursor agree");
+        assert_eq!(
+            glyph_at(&term, at.x, at.y),
+            "s",
+            "the caret sits *on* the character, not before it"
+        );
+        assert_eq!(caret_bg(&term, at.x, at.y), theme::CARET, "and it is the amber caret");
         assert!(
             status_line(&term, 100, 30).contains("line 1, col 4"),
             "the ruler reads the same position: {}",
             status_line(&term, 100, 30)
         );
         let _ = first;
+    }
+
+    /// The report: "the caret seems to move the character instead of on the
+    /// character itself." It did -- the caret was an inserted glyph, so every
+    /// character after the cursor was pushed one cell right and the text crawled
+    /// sideways whenever the caret moved. The caret is a style now, so the row's
+    /// characters are the same wherever it sits.
+    #[test]
+    fn the_caret_does_not_move_the_text() {
+        let mut a = app("caret_shift");
+        a.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(a.editor.is_some());
+
+        let mut rows = Vec::new();
+        for cursor in [0usize, 3, 8, 11] {
+            if let Some(ed) = a.editor.as_mut() {
+                ed.cursor = cursor;
+            }
+            let term = draw(&mut a, 100, 30);
+            let row = row_text(&term, 100, 1);
+            assert!(
+                row.contains("first block"),
+                "the block's text is unbroken at cursor {cursor}: {row:?}"
+            );
+            rows.push(row);
+        }
+        // "first block" is 11 characters, so the last cursor is past the text and
+        // the caret gets a blank cell -- the row is otherwise identical.
+        assert_eq!(rows[0], rows[1], "the text must not move with the caret");
+        assert_eq!(rows[1], rows[2]);
+        assert!(rows[3].starts_with(rows[0].trim_end()), "{rows:?}");
     }
 
     /// A cursor sitting *on* the newline that ends a line used to fall through
@@ -2433,6 +2650,72 @@ mod render_tests {
         assert!(wide.contains("all keys"), "{wide}");
     }
 
+    /// A code block on screen: the body verbatim under a `CODE · lang` badge,
+    /// the fence itself hidden (it is markup), and the code's own background so
+    /// it reads as a different kind of thing from the prose around it.
+    #[test]
+    fn a_code_block_renders_its_body_under_a_badge() {
+        let mut a = app("code_render");
+        let page = a.db.ensure_page("Snippets", PageKind::Page);
+        a.db.create_block(
+            page.id,
+            None,
+            None,
+            "```rust
+fn main() { println!(\"[[x]]\"); }
+```",
+        );
+        a.db.create_block(page.id, None, None, "prose after the code");
+        a.goto_page("Snippets");
+        // Select the prose block, so the code is drawn unselected and its own
+        // background is the thing being asserted.
+        press(&mut a, 'j');
+
+        let term = draw(&mut a, 100, 30);
+        let code_row = row_text(&term, 100, 1);
+        assert!(code_row.contains("CODE · rust"), "{code_row}");
+        assert!(code_row.contains("fn main()"), "{code_row}");
+        assert!(
+            !code_row.contains("```"),
+            "the fence is markup, not content: {code_row}"
+        );
+        // The body is drawn on the code background, not the prose one.
+        let x = code_row.find("fn main").expect("the code is on screen") as u16 + 1;
+        assert_eq!(
+            term.backend().buffer()[(x, 1)].bg,
+            theme::PANEL_ALT,
+            "code has its own background"
+        );
+        // And the fence does not become a link marker.
+        assert!(!code_row.contains('↗'), "{code_row}");
+    }
+
+    /// A code block's line wraps inside the pane, badge and all, and loses
+    /// nothing on the way: code that is silently truncated is worse than code
+    /// that wraps.
+    #[test]
+    fn a_long_code_line_wraps_without_losing_anything() {
+        let mut a = app("code_wrap");
+        let page = a.db.ensure_page("Code wrap", PageKind::Page);
+        let body = "x".repeat(300);
+        a.db.create_block(page.id, None, None, &format!("```rust\n{body}\n```"));
+        a.goto_page("Code wrap");
+
+        for w in [24usize, 40, 100] {
+            let row = a.rows[0].clone();
+            let lines = block_lines(&a, &row, w, false);
+            for l in &lines {
+                assert!(l.width() <= w, "{} cells in a {w}-cell pane", l.width());
+            }
+            let text: String = lines
+                .iter()
+                .flat_map(|l| l.spans.iter().map(|s| s.content.to_string()))
+                .collect();
+            assert_eq!(text.matches('x').count(), 300, "every character survives");
+            assert!(text.contains("CODE · rust"), "and the badge is still there");
+        }
+    }
+
     /// The help screen's two columns are split at a named section and headed
     /// with the sections they actually hold. The bug this closes: the headings
     /// were hardcoded strings while the split was computed as "the boundary
@@ -2486,7 +2769,11 @@ mod render_tests {
         let term = draw(&mut a, 100, 30);
         assert!(term.backend().cursor_visible());
         let at = term.backend().cursor_position();
-        assert_eq!(glyph_at(&term, at.x, at.y), "▏");
+        assert_eq!(
+            caret_bg(&term, at.x, at.y),
+            theme::CARET,
+            "an empty block has no character to invert, so the caret is a blank cell"
+        );
         assert!(
             status_line(&term, 100, 30).contains("line 1, col 1"),
             "{}",

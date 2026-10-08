@@ -1,5 +1,5 @@
 ╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│▌▾ Deep work 09:00–12:30 on the ▏block store                                                                                              │
+│▌▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
 │ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  TEXT mode: vim Normal, with the cursor inside the block   w b e 0 ^ $ x dw cw · Esc returns to the block list
  NORMAL   in block    1/12                                                                                                   line 1, col 30
- j/k back to the blocks   w b e 0 $ move   x dw cw delete, change   ⏎ i a type   o new block   Ctrl-] follow link   Esc drop the caret
+ j/k back to the blocks   w b e 0 $ move   x dw cw delete, change   ⏎ i a type   Tab indent   o new block               Esc drop the caret

@@ -3,12 +3,12 @@
 │  engine             SQLite · WAL · FTS5                      ││  one file in, one file out — no document merge, no conflict soup         │
 │  file size          108.0 KB                                 ││                                                                          │
 │  wal size           0 B                                      ││  WHEN            SIZE      STATE     FILE                                │
-│  integrity          ok                                       ││  01:59:48      1.1 MB   uploaded blok-20261008-015948.sqlite             │
-│                                                              ││  04:59:48      1.1 MB   uploaded blok-20261008-045948.sqlite             │
-│  tables                                                      ││  07:59:48      1.1 MB   uploaded blok-20261008-075948.sqlite             │
-│  pages              12 rows                                  ││  10:59:48      1.1 MB   uploaded blok-20261008-105948.sqlite             │
-│  journals           4 rows                                   ││  13:59:48      1.1 MB   uploaded blok-20261008-135948.sqlite             │
-│  blocks             39 rows                                  ││  16:59:48      1.1 MB   queued   blok-20261008-165948.sqlite             │
+│  integrity          ok                                       ││  04:39:44      1.1 MB   uploaded blok-20261008-043944.sqlite             │
+│                                                              ││  07:39:44      1.1 MB   uploaded blok-20261008-073944.sqlite             │
+│  tables                                                      ││  10:39:44      1.1 MB   uploaded blok-20261008-103944.sqlite             │
+│  pages              12 rows                                  ││  13:39:44      1.1 MB   uploaded blok-20261008-133944.sqlite             │
+│  journals           4 rows                                   ││  16:39:44      1.1 MB   uploaded blok-20261008-163944.sqlite             │
+│  blocks             39 rows                                  ││  19:39:44      1.1 MB   queued   blok-20261008-193944.sqlite             │
 │  refs               11 rows                                  ││                                                                          │
 │  properties         5 rows                                   ││  WHY THIS IS SAFE                                                        │
 │                                                              ││  ▸ VACUUM INTO writes a consistent snapshot while the app keeps running. │

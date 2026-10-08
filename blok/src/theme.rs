@@ -95,6 +95,14 @@ impl Theme {
             .bg(SELECT_BG)
             .add_modifier(Modifier::BOLD)
     }
+
+    /// The caret inside the block editor: the cell it sits on, inverted. A
+    /// *style*, never an extra character -- an inserted glyph pushed every
+    /// character after the cursor one cell to the right, so the text crawled
+    /// sideways whenever the caret moved.
+    pub fn caret_block() -> Style {
+        Style::default().fg(BG).bg(CARET)
+    }
 }
 
 /// Status keyword -> colour, Logseq's TODO/DOING/DONE/NOW/LATER set.

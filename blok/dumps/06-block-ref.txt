@@ -8,7 +8,7 @@
 │ │ │ • deadline:: 2026-02-20                                                                                                              │
 │       priority:: A                                                                                                                       │
 │ │ • DOING Write up the sync story for [[blok TUI]] ↗1                                                                                    │
-│▌▾ See also ((snap▏                                                                                                                       │
+│▌▾ See also ((snap                                                                                                                        │
 │ │ • An empty day ╭ Reference a block · ((snap ────────────────────────╮                                                                  │
 │ • Reading:  VACUU│▸ DOING Snapshot uploader (rclo… block  Project A…  │                                                                  │
 │ • Storage trail: │  Constraint: laptops on 2G lin… block  Project A…  │                                                                  │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    9/12                                                                                                              line 1, col 16
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag

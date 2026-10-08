@@ -4,6 +4,11 @@
 
 use crate::model::properties;
 
+/// One indent step. Two spaces because a block is not a file: deep indentation
+/// in an outliner costs width that the outline needs, and code inside a block
+/// is short by nature.
+pub const INDENT: usize = 2;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mode {
     /// Tree normal: vim's Normal mode with the *block* as the line.
@@ -230,6 +235,52 @@ impl Editor {
             i += 1;
         }
         i
+    }
+
+    /// `Tab` in the text: two spaces at the caret. In a code block this is code
+    /// indentation; in prose it is prose indentation. What it is *not* is a
+    /// structural re-indent of the whole block, which is what Tab used to do the
+    /// moment the caret was in the text.
+    pub fn indent(&mut self) {
+        self.insert_str(&" ".repeat(INDENT));
+    }
+
+    /// `Shift-Tab`: give back one indent step of leading whitespace, on the line
+    /// the caret is on and no other. Nothing to give back means nothing happens.
+    pub fn dedent(&mut self) {
+        let mut start = self.cursor.min(self.chars.len());
+        while start > 0 && self.chars[start - 1] != '\n' {
+            start -= 1;
+        }
+        let mut n = 0usize;
+        while n < INDENT && self.chars.get(start + n) == Some(&' ') {
+            n += 1;
+        }
+        if n == 0 {
+            return;
+        }
+        self.chars.drain(start..start + n);
+        self.cursor = if self.cursor >= start + n {
+            self.cursor - n
+        } else {
+            start
+        };
+        self.dirty = true;
+        self.anchor = None;
+    }
+
+    /// Put the cursor at the start of 0-based line `n`, clamped to the last line.
+    /// Used by `/Code`, where the caret belongs between the fences.
+    pub fn goto_line(&mut self, n: usize) {
+        let mut line = 0usize;
+        let mut i = 0usize;
+        while i < self.chars.len() && line < n {
+            if self.chars[i] == '\n' {
+                line += 1;
+            }
+            i += 1;
+        }
+        self.cursor = i;
     }
 
     /// `D` / `d$`
@@ -467,5 +518,70 @@ mod tests {
         let mut e = ed("abc", 0);
         e.cursor = 99;
         assert_eq!(e.position(), (1, 4));
+    }
+}
+
+#[cfg(test)]
+mod indent_tests {
+    use super::*;
+
+    fn ed(text: &str, cursor: usize) -> Editor {
+        let mut e = Editor::new(1, "blk-1", text, 0);
+        e.cursor = cursor;
+        e
+    }
+
+    /// `Tab` in the text writes two spaces and nothing else -- it must never be
+    /// a structural re-indent of the block the caret is sitting in.
+    #[test]
+    fn indent_inserts_spaces_at_the_caret() {
+        let mut e = ed("abc", 1);
+        e.indent();
+        assert_eq!(e.text(), "a  bc");
+        assert_eq!(e.cursor, 3);
+        assert!(e.dirty);
+
+        // In a code block, mid-line indentation is the whole point.
+        let mut e = ed("if x:\nreturn 1", 6);
+        e.indent();
+        assert_eq!(e.text(), "if x:\n  return 1");
+    }
+
+    /// Shift-Tab takes back one indent step, and only from the line the caret is
+    /// on. It is the inverse of `indent`, so two Tabs and two Shift-Tabs
+    /// round-trip.
+    #[test]
+    fn dedent_removes_one_step_from_this_line_only() {
+        let mut e = ed("    one\n        two", 20);
+        e.dedent();
+        assert_eq!(e.text(), "    one\n      two", "only the caret's line");
+
+        let mut e = ed("    one", 7);
+        e.dedent();
+        assert_eq!(e.text(), "  one");
+        assert_eq!(e.cursor, 5);
+
+        // A cursor inside the leading whitespace is clamped to the new start.
+        let mut e = ed("    one", 1);
+        e.dedent();
+        assert_eq!(e.text(), "  one");
+        assert_eq!(e.cursor, 0);
+
+        // Nothing to take: no change, and no dirt.
+        let mut e = ed("one\ntwo", 5);
+        e.dedent();
+        assert_eq!(e.text(), "one\ntwo");
+        assert!(!e.dirty);
+    }
+
+    #[test]
+    fn indent_and_dedent_round_trip() {
+        let mut e = ed("code", 0);
+        e.indent();
+        e.indent();
+        assert_eq!(e.text(), "    code");
+        e.dedent();
+        e.dedent();
+        assert_eq!(e.text(), "code");
     }
 }

@@ -25,7 +25,7 @@ cargo run -- --db ./scratch.db        # use a throwaway database
 cargo run -- --dump dumps             # re-render every mockup frame
 cargo run -- --demo-lifecycle         # print the journal create/prune trace
 cargo run -- --stats                  # row counts, FTS5 availability, integrity
-cargo test                            # 37 regression tests, one per bug
+cargo test                            # 51 regression tests, one per bug
 ```
 
 Dependencies: `ratatui` 0.30, `crossterm` 0.29, `rusqlite` 0.40 (`bundled`, so
@@ -41,7 +41,7 @@ src/
   editor.rs    single-block editor: cursor, soft wrap, `[[`/`((`/`/` triggers
   app.rs       state machine: views, panes, structural edits, undo, keymap
   ui.rs        every screen (the mockups are this file's real output)
-  mockups.rs   the 29 framed fixtures driven through the real renderer
+  mockups.rs   the 31 framed fixtures driven through the real renderer
   theme.rs     palette, badges, TODO cycling
 dumps/         NN-name.txt (plain) · NN-name.ans (24-bit) · png/ (rasterised)
 tools/         render_png.py — ANSI frame -> PNG screenshot
@@ -78,7 +78,8 @@ a block's text (press `Enter`) and still be in NORMAL, and any tree motion leave
 it, so the text cursor is a position rather than a fourth mode you can get stuck
 in. `Ctrl-]` or `gf` follows a link (`↗N` marks the blocks that have them),
 `[`/`]` (and `Ctrl-o`/`Ctrl-i`) walk back and forward through the pages you have
-opened, `dd`/`yy`/`p` operate on whole subtrees,
+opened, `Tab` indents the line the caret is on (the block, from the tree),
+`dd`/`yy`/`p` operate on whole subtrees,
 `u`/`Ctrl-r` undo and redo, and everything app-level is a `:` command (`:e`,
 `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
 are listed in [DESIGN.md §7.5](DESIGN.md).

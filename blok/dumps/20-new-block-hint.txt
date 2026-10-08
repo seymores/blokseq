@@ -8,7 +8,7 @@
 │ │ │ • deadline:: 2026-02-20                                                                                                              │
 │       priority:: A                                                                                                                       │
 │ │ • DOING Write up the sync story for [[blok TUI]] ↗1                                                                                    │
-│▌▾ ▏                                                                                                                                      │
+│▌▾                                                                                                                                        │
 │ │ • An empty day should not exist anywhere — not on disk, not in the DB                                                                  │
 │ • Reading:  VACUUM INTO  semantics                                                                                                       │
 │ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync ↗3                                                                                    │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    9/12                                                                                                               line 1, col 1
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag

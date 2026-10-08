@@ -380,6 +380,10 @@ impl App {
         let Some(b) = self.db.block(block_id) else {
             return Vec::new();
         };
+        // Code is not prose: a `[[x]]` in a code block is not a destination.
+        if crate::model::is_code(&b.content) {
+            return Vec::new();
+        }
         let chars: Vec<char> = b.content.chars().collect();
         let mut out = Vec::new();
         let mut i = 0usize;
@@ -1317,6 +1321,11 @@ impl App {
             match seq {
                 "h" => ed.left(),
                 "l" => ed.right(),
+                // Tab is indentation while the caret is in the text, and a
+                // structural re-indent (">>") only from the tree. `>>` still
+                // indents the block from here, because it says so.
+                "<Tab>" => ed.indent(),
+                "<S-Tab>" => ed.dedent(),
                 "w" => ed.word_right(),
                 "b" => ed.word_left(),
                 "e" => ed.word_end(),
@@ -1867,5 +1876,140 @@ mod tests {
                 .is_some_and(|t| t.text.contains("no page to go forward")),
             "and it says there is nothing ahead"
         );
+    }
+
+    /// The slash menu advertised a code block and wrote the word "Code". Now it
+    /// writes a fence, and the caret lands on the line between the fences where
+    /// the code goes.
+    #[test]
+    fn slash_code_opens_a_fence_with_the_caret_inside_it() {
+        let mut a = app("slash_code");
+        code(&mut a, KeyCode::Enter); // caret into the block
+        key(&mut a, 'i'); // insert
+
+        for c in "/Code".chars() {
+            key(&mut a, c);
+        }
+        assert!(a.popup.is_some(), "typing / opens the slash menu");
+        code(&mut a, KeyCode::Enter);
+
+        let ed = a.editor.as_ref().expect("still editing");
+        assert_eq!(ed.text(), "```\n\n```", "a fence, not the word Code");
+        assert_eq!(ed.position(), (2, 1), "the caret is inside the fence");
+    }
+
+    /// A code block is the one place the app must not interpret anything:
+    /// `#include` is not a tag, `[[x]]` in a string is not a page, and a
+    /// `key:: value` in a sample is not a property of yours.
+    #[test]
+    fn a_code_block_creates_no_refs_and_no_properties() {
+        let mut a = app("code_refs");
+        let page = a.db.ensure_page("Snippets", PageKind::Page);
+        let code = "```c\n#include <stdio.h>\nchar *s = \"[[not a page]]\";\nid:: 7\n#not a tag\n```";
+        a.db.create_block(page.id, None, None, code);
+
+        let meta = a.db.page_meta(page.id).expect("meta");
+        assert_eq!(
+            meta.properties.len(),
+            0,
+            "nothing inside a fence is a property: {:?}",
+            meta.properties
+        );
+        assert_eq!(meta.refs_out, 0);
+
+        // The same shape outside a fence *is* interpreted, which is the whole
+        // reason the fence has to be respected.
+        let prose = a.db.ensure_page("Prose", PageKind::Page);
+        a.db.create_block(prose.id, None, None, "#realtag\nid:: 7");
+        let meta = a.db.page_meta(prose.id).expect("meta");
+        assert_eq!(meta.properties.len(), 1);
+        assert_eq!(meta.refs_out, 1);
+    }
+
+    /// Turning a prose block into a code block has to clean up after it: the
+    /// refs it created must not linger just because the text now says "do not
+    /// interpret this".
+    #[test]
+    fn fencing_a_block_removes_the_refs_it_had() {
+        let mut a = app("code_cleanup");
+        let page = a.db.ensure_page("Cleanup", PageKind::Page);
+        let b = a.db.create_block(page.id, None, None, "see [[Test Page]] and #atag");
+        assert_eq!(a.db.page_meta(page.id).unwrap().refs_out, 2);
+
+        a.db.update_content(b.id, "```\nsee [[Test Page]] and #atag\n```");
+        assert_eq!(
+            a.db.page_meta(page.id).unwrap().refs_out,
+            0,
+            "the fence takes the refs away"
+        );
+    }
+
+    /// Report: "tab when in edit mode should indent." With the caret in the
+    /// text, Tab indents the *text* and Shift-Tab gives it back. From the tree,
+    /// where there is no caret in a block, Tab still re-indents the block.
+    #[test]
+    fn tab_indents_the_text_when_the_caret_is_in_it() {
+        let mut a = app("tab_text");
+        code(&mut a, KeyCode::Enter);
+        assert!(a.text_focus);
+        let id = a.rows[0].id;
+        let depth_before = a.rows[0].depth;
+
+        code(&mut a, KeyCode::Tab);
+        assert_eq!(
+            a.editor.as_ref().unwrap().text(),
+            "  first block",
+            "Tab writes an indent at the caret"
+        );
+        code(&mut a, KeyCode::BackTab);
+        assert_eq!(a.editor.as_ref().unwrap().text(), "first block");
+
+        // In INSERT too, because that is what "edit mode" usually means.
+        key(&mut a, 'i');
+        code(&mut a, KeyCode::Tab);
+        assert!(a.editor.as_ref().unwrap().text().starts_with("  "));
+
+        key(&mut a, 'x');
+        code(&mut a, KeyCode::Esc); // commits
+        let content = a.db.block(id).map(|b| b.content).unwrap_or_default();
+        assert_eq!(content, "  xfirst block", "and it is saved");
+        assert_eq!(
+            a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
+            Some(depth_before),
+            "the block's own indentation is untouched"
+        );
+        assert!(a.db.block(id).and_then(|b| b.parent_id).is_none());
+    }
+
+    /// The other half of the report: from the tree, Tab is still a structural
+    /// indent, and `>>` still does it with the caret in the text.
+    #[test]
+    fn tab_from_the_tree_still_indents_the_block() {
+        let mut a = app("tab_structure");
+        assert!(!a.text_focus);
+        // The first block has no previous sibling to adopt, so indenting it is
+        // correctly a no-op: use the second.
+        key(&mut a, 'j');
+        let id = a.rows[1].id;
+        code(&mut a, KeyCode::Tab);
+        assert_eq!(
+            a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
+            Some(1),
+            "Tab from the tree indents the block"
+        );
+        assert!(a.editor.is_none(), "and it did not open an editor");
+
+        // `>>` with the caret in the text says what it does: structure, not text.
+        code(&mut a, KeyCode::Enter);
+        assert!(a.text_focus);
+        let depth = a.rows.iter().find(|r| r.id == id).map(|r| r.depth);
+        key(&mut a, '>');
+        key(&mut a, '>');
+        assert_eq!(
+            a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
+            depth,
+            "there is no previous sibling at this level, so nothing moves"
+        );
+        assert!(a.db.block(id).and_then(|b| b.parent_id).is_some());
     }
 }

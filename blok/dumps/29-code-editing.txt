@@ -1,20 +1,21 @@
-╭ 2026-10-08  today · 13 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ▾ Deep work 09:00–12:30 on the block store                                                                                               │
-│ │ • Replaced the integer  position  with a fractional index                                                                              │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
-│ ▾ Standup — [[Project Aurora]] ↗1                                                                                                        │
-│ │ • Export format settled: the SQLite file *is* the format                                                                               │
-│ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                                                                                  │
-│ │ │ • deadline:: 2026-02-20                                                                                                              │
-│       priority:: A                                                                                                                       │
-│ │ • DOING Write up the sync story for [[blok TUI]] ↗1                                                                                    │
-│ ▾ Idea: journals are rows, not files #blok ↗1                                                                                            │
-│ │ • An empty day should not exist anywhere — not on disk, not in the DB                                                                  │
-│▌•                                                                                                                                        │
-│ • Reading:  VACUUM INTO  semantics                                                                                                       │
-│ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync ↗3                                                                                    │
+╭ SQLite  2 blocks · 1 ref ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ • WAL, FTS5, VACUUM INTO, fractional indexing                                                                                            │
+│▌• ```rust                                                                                                                                │
+│   let page = db.page_by_name("SQLite")?; // [[not a link]]                                                                               │
+│   // #not a tag, and id:: is not a property                                                                                              │
+│   for b in db.page_blocks(page.id) {                                                                                                     │
+│       println!("{:>6}  {}", b.id, b.content);                                                                                            │
+│   }                                                                                                                                      │
+│   ```                                                                                                                                    │
 │                                                                                                                                          │
-│  • type here for the next block — or press o                                                                                             │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
+│                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
@@ -37,6 +38,5 @@
 │                                                                                                                                          │
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ·  Enter opened an empty block below, still in insert mode   state lives in the session, not in the database
- INSERT   11/13                                                                                                               line 1, col 1
+ INSERT    2/2                                                                                                               line 2, col 32
  Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag

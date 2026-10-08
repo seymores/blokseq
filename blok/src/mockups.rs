@@ -747,6 +747,34 @@ fn cases() -> Vec<Case> {
             },
         },
         Case {
+            name: "28-code-block",
+            width: 118,
+            height: 38,
+            build: |app| {
+                seed_code(app);
+                app.goto_page("SQLite");
+                // Select the prose block, so the code is drawn unselected and its
+                // own background is visible next to the prose one.
+                app.select_containing("WAL, FTS5");
+            },
+        },
+        Case {
+            name: "29-code-editing",
+            width: 118,
+            height: 38,
+            build: |app| {
+                seed_code(app);
+                app.goto_page("SQLite");
+                app.select_containing("let page = db");
+                app.begin_edit();
+                // Somewhere in the middle of a line of code, which is where the
+                // caret lives most of the time in a code block.
+                if let Some(ed) = app.editor.as_mut() {
+                    ed.cursor = "```rust\nlet page = db.page_by_name(\"SQL".chars().count();
+                }
+            },
+        },
+        Case {
             name: "27-find-recent",
             width: 118,
             height: 38,
@@ -761,6 +789,21 @@ fn cases() -> Vec<Case> {
             },
         },
     ]
+}
+
+/// A code block, added by the frames that are about code rather than by the
+/// shared seed: the pages a fence demonstrates are not the pages the rest of
+/// the frames are about, and a fixture nobody else uses cannot shift one.
+fn seed_code(app: &mut App) {
+    let sqlite = app.db.ensure_page("SQLite", PageKind::Page);
+    app.db.create_block(
+        sqlite.id,
+        None,
+        None,
+        "```rust\nlet page = db.page_by_name(\"SQLite\")?; // [[not a link]]\n// #not a tag, and id:: is not a property\nfor b in db.page_blocks(page.id) {\n    println!(\"{:>6}  {}\", b.id, b.content);\n}\n```",
+    );
+    app.db.refresh_stats();
+    app.reload();
 }
 
 // Fixture helpers: name a block by its text instead of an index, so adding a

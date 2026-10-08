@@ -62,7 +62,7 @@ rather than hiding it.
 | 2 | **Empty journals are pruned, and journals are lazily materialised** | A day you merely *looked at* never becomes a row in the database. See §4. |
 | 3 | **SQLite is the document — no markdown anywhere** | Blocks are rows, links are rows, search is an FTS5 index. Transactions, crash safety and referential integrity come free. |
 | 4 | **Backup = one `VACUUM INTO` snapshot, copied to a remote** | Never sync a live database file (WAL sidecars, hot journals, filesystem locking — see §5). Snapshot, then copy the snapshot. |
-| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.5). |
+| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.6). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
 | 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `Ctrl-M` (or `:set meta`) and persists; the outline is the whole window until then. |
@@ -376,7 +376,7 @@ ref shown with its target's text.*
 
 **The caret inside a block.** `Enter` puts the caret in the text without changing
 mode; word and line motions work there, and any tree motion leaves it. One
-`Esc` from typing always returns to NORMAL (see §7.5 — this part was two modes
+`Esc` from typing always returns to NORMAL (see §7.6 — this part was two modes
 and a three-step ladder in the previous revision, which was a design error).
 
 ![Caret in a block](dumps/png/22-text-normal-vim.png)
@@ -446,9 +446,16 @@ block semantics).
 ![Block editing](dumps/png/03-block-editing.png)
 
 The block under the caret is rendered with a hot background (`▌` marker, raised
-line background) and the caret is drawn *inside the text* as `▏`, between `09`
-and `:00` above: the cursor is a character index, and the line is soft-wrapped
-underneath it.
+line background) and the caret is a **style on the cell it sits on**, inverted:
+the cursor is a character index, and the line is soft-wrapped underneath it.
+
+It used to be an inserted glyph (`▏`), which is a different thing and looked
+like one: every character after the cursor was pushed one cell to the right, so
+the text crawled sideways whenever the caret moved, and at the end of a full line
+the extra cell pushed a word onto the next display row. The report was "the caret
+seems to move the character instead of on the character itself", and it was
+literally true. `the_caret_does_not_move_the_text` now renders the same block at
+four caret positions and insists the row's characters are identical.
 
 **This paragraph used to be false.** It claimed the caret *was* the hardware
 cursor, placed with `Frame::set_cursor_position()`, and that `fake_caret` existed
@@ -499,7 +506,32 @@ line of the block, so the status bar reads `line 2, col 5` while the block index
 on the left still says `7/12`. Two different questions — where in the page, where
 in the block — two different numbers, and neither is an approximation.
 
-### 7.2 Structure edits
+### 7.2 Code blocks
+
+![A code block in the outline](dumps/png/28-code-block.png)
+
+A block whose first line is a fence is code. The language token after the fence
+becomes a `CODE · lang` badge, the fence itself is markup and is not shown, and
+the body is rendered verbatim — leading spaces included, wrapped by *character*
+rather than by word, because reflowing a program at its spaces destroys the
+alignment that makes it readable.
+
+The point is what does **not** happen inside it. `#include` is not a tag,
+`[[placeholder]]` inside a string is not a page, `key:: value` in a YAML sample
+is not a property of the page — none of them reach the `refs` or `properties`
+tables, the metadata panel or the `↗N` marker. Every reader of block text asks
+`is_code` first; that is the whole contract of a fence, and it is why a fence is
+the one piece of markup this app keeps.
+
+![Editing a code block](dumps/png/29-code-editing.png)
+
+While you edit one, the fence *is* shown and coloured as a delimiter, because the
+fence is the markup and this app edits markup as text. The completion popups are
+off in there, so typing `#` in code cannot open the tag menu. `/Code` is the way
+in: it writes an unterminated fence with the caret on the line between the
+fences, and the language is yours to type — a default would be a guess.
+
+### 7.3 Structure edits
 
 | Action | Keys | Semantics |
 |---|---|---|
@@ -525,7 +557,7 @@ An empty block that is never filled in is a *session* artifact: it is not
 special-cased in the database, it is simply an empty row that the next save pass
 would drop, and the storage screen counts it ("empty blocks: 1 (transient)").
 
-### 7.3 Visual mode: batching structure edits
+### 7.4 Visual mode: batching structure edits
 
 ![Visual multi-select](dumps/png/10-visual-multiselect.png)
 
@@ -536,7 +568,7 @@ block's previous sibling, `d` soft-deletes them, `u` restores. `V` selects a
 whole subtree (a subtree is contiguous in the flattened rows). This is the
 terminal-native answer to dragging a subtree with a mouse.
 
-### 7.4 Undo
+### 7.5 Undo
 
 `u` pops an `UndoOp`, `Ctrl-r` pushes it back:
 
@@ -556,7 +588,7 @@ would replay; `outl`'s lesson is that **fold state belongs in that log** (so fol
 converge) while **zoom belongs to the client** (so it never syncs). blok keeps
 `collapsed` in the row for now and notes the split.
 
-### 7.5 Vim conformance, and the one place an outliner bends it
+### 7.6 Vim conformance, and the one place an outliner bends it
 
 The brief was "editing should follow VIM convention completely". The only real
 conflict is that vim's model is *lines in a file*, and here the unit is a
@@ -635,7 +667,8 @@ vim's grammar is made visible rather than assumed.
 | `dd` `x` | delete the block, subtree included |
 | `yy` `Y` | yank the block into the register |
 | `p` `P` | paste the register after / before |
-| `>>` `<<` (or `Tab`, `Shift-Tab`) | indent / outdent |
+| `>>` `<<` | indent / outdent the **block** (from the tree, `Tab`/`Shift-Tab` too) |
+| `Tab` `Shift-Tab` (in the text) | indent / dedent the **line the caret is on** |
 | `J` | join: merge this block with the one below |
 | `u` `Ctrl-r` | undo / redo |
 | `za` `zc` `zo` `zR` `zM` | fold · close · open · all open · all closed |
@@ -652,7 +685,7 @@ vim's grammar is made visible rather than assumed.
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
 | `?` | the keymap |
 
-**The deviations, stated rather than glossed** (also in §7.5):
+**The deviations, stated rather than glossed** (also in §7.6):
 
 * `hjkl` navigate the *tree*, not a document — there is no document.
 * `Enter` moves the cursor into the block's text in Normal mode rather than down
@@ -796,7 +829,15 @@ Being explicit about this matters more than the demo looking good.
   had grown to 204 cells in a 140-cell row, so the two most useful things on it
   -- the new bracket keys and the pointer to the manual -- were exactly the two
   that got cut.
-* The key router is covered by 37 regression tests (`cargo test`), one per bug
+* Editing has its own regressions, one per report: `the_caret_does_not_move_the_text`
+  (the caret is a style, not a character), `tab_indents_the_text_when_the_caret_is_in_it`
+  and `tab_from_the_tree_still_indents_the_block` (`Tab` is indentation in the text
+  and structure from the tree), `slash_code_opens_a_fence_with_the_caret_inside_it`,
+  `a_code_block_creates_no_refs_and_no_properties` and
+  `fencing_a_block_removes_the_refs_it_had` (the fence's contract), plus
+  `a_code_block_renders_its_body_under_a_badge` and the `Editor` unit tests for
+  `indent`/`dedent`/`position`.
+* The key router is covered by 51 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -804,7 +845,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 29 frames in this document are the app's own renderer (29 frames, 37
+* All 31 frames in this document are the app's own renderer (31 frames, 51
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

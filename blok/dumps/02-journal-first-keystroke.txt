@@ -1,5 +1,5 @@
 ╭ 2026-10-08 · provisional  today · 0 blocks ──────────────────────────────────────────────────────────────────────────────────────────────╮
-│▌• Woke up thinking about the sync story▏                                                                                                 │
+│▌• Woke up thinking about the sync story                                                                                                  │
 │                                                                                                                                          │
 │   the first keystroke is what creates this day                                                                                           │
 │                                                                                                                                          │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  INSERT    1/1                                                                                                               line 1, col 38
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag
