@@ -1,42 +1,42 @@
 ╭ SQLite  2 blocks · 1 ref ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ • WAL, FTS5, VACUUM INTO, fractional indexing                                                                                            │
-│▌• ```rust                                                                                                                                │
-│   let page = db.page_by_name("SQLite")?; // [[not a link]]                                                                               │
-│   // #not a tag, and id:: is not a property                                                                                              │
-│   for b in db.page_blocks(page.id) {                                                                                                     │
-│       println!("{:>6}  {}", b.id, b.content);                                                                                            │
-│   }                                                                                                                                      │
-│   ```                                                                                                                                    │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
+│   // line 13 of the snippet                                                                                                              │
+│   // line 14 of the snippet                                                                                                              │
+│   // line 15 of the snippet                                                                                                              │
+│   // line 16 of the snippet                                                                                                              │
+│   // line 17 of the snippet                                                                                                              │
+│   // line 18 of the snippet                                                                                                              │
+│   // line 19 of the snippet                                                                                                              │
+│   // line 20 of the snippet                                                                                                              │
+│   // line 21 of the snippet                                                                                                              │
+│   // line 22 of the snippet                                                                                                              │
+│   // line 23 of the snippet                                                                                                              │
+│   // line 24 of the snippet                                                                                                              │
+│   // line 25 of the snippet                                                                                                              │
+│   // line 26 of the snippet                                                                                                              │
+│   // line 27 of the snippet                                                                                                              │
+│   // line 28 of the snippet                                                                                                              │
+│   // line 29 of the snippet                                                                                                              │
+│   // line 30 of the snippet                                                                                                              │
+│   // line 31 of the snippet                                                                                                              │
+│   // line 32 of the snippet                                                                                                              │
+│   // line 33 of the snippet                                                                                                              │
+│   // line 34 of the snippet                                                                                                              │
+│   // line 35 of the snippet                                                                                                              │
+│   // line 36 of the snippet                                                                                                              │
+│   // line 37 of the snippet                                                                                                              │
+│   // line 38 of the snippet                                                                                                              │
+│   // line 39 of the snippet                                                                                                              │
+│   // line 40 of the snippet                                                                                                              │
+│   // line 41 of the snippet                                                                                                              │
+│   // line 42 of the snippet                                                                                                              │
+│   // line 43 of the snippet                                                                                                              │
+│   // line 44 of the snippet                                                                                                              │
+│   // line 45 of the snippet                                                                                                              │
+│   // line 46 of the snippet                                                                                                              │
+│   // line 47 of the snippet                                                                                                              │
+│   // line 48 of the snippet                                                                                                              │
+│   // line 49 of the snippet                                                                                                              │
+│   // line 50 of the snippet                                                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- INSERT    2/2                                                                                                               line 2, col 32
- Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   Tab indent   / commands   [[ link page   (( block ref   # tag
+ INSERT    2/2                                                                                                              line 51, col 26
+ Esc stop editing   ⏎ newline   Tab / Shift-Tab indent / dedent   ↑ ↓ between lines

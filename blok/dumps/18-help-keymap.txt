@@ -30,12 +30,12 @@
 │  x dw d$ D           delete char · word · to line end        Text     ││                                                                 │
 │  cw ciw C            change word · to line end               Text     ││                                                                 │
 │  Ctrl-w / Ctrl-u     delete word / to line start             Insert   ││                                                                 │
+│  ⏎ in a fence        newline, indented like the line above   Insert   ││                                                                 │
+│  ↑ ↓ · gj gk         move between the lines of one block     Normal, I││                                                                 │
 │                                                                       ││                                                                 │
 │  INLINE COMPLETION                                                    ││                                                                 │
 │  /                   slash commands inside a block           Insert   ││                                                                 │
 │  [[ (( #             page link · block ref · tag             Insert   ││                                                                 │
-│                                                                       ││                                                                 │
-│                                                                       ││                                                                 │
 │                                                                       ││                                                                 │
 ╰───────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
  NORMAL  Esc goes back

@@ -1272,6 +1272,23 @@ impl App {
             return;
         }
 
+        // With the caret in a block, the arrow keys move *inside* it, in NORMAL
+        // as well as INSERT. `j`/`k` stay the way out -- one key still leaves the
+        // block -- so `gj`/`gk` (and these) are how you walk a multi-line block.
+        if self.text_focus
+            && self.mode == Mode::Normal
+            && matches!(k.code, KeyCode::Up | KeyCode::Down)
+        {
+            if let Some(ed) = self.editor.as_mut() {
+                if k.code == KeyCode::Down {
+                    ed.line_down();
+                } else {
+                    ed.line_up();
+                }
+            }
+            return;
+        }
+
         if self.mode == Mode::Insert {
             self.insert_key(k, ctrl, alt);
             return;
@@ -1286,11 +1303,19 @@ impl App {
         match k.code {
             KeyCode::Esc => {
                 // One Escape always leaves editing, as in vim. The caret stays
-                // in the block (text_focus); the next tree motion walks away.
+                // in the block (text_focus) *and where it was*: committing takes
+                // the buffer, so the position has to be carried across the
+                // reload -- without that the caret jumped to the end of the
+                // block's text, which in a multi-line block means losing your
+                // place every time you stop typing.
                 let id = self.editor.as_ref().map(|e| e.block_id);
+                let cursor = self.editor.as_ref().map(|e| e.cursor);
                 self.commit_edit();
                 if let Some(id) = id {
                     self.begin_edit_block(id);
+                    if let (Some(c), Some(ed)) = (cursor, self.editor.as_mut()) {
+                        ed.cursor = c.min(ed.chars.len());
+                    }
                     self.text_focus = true;
                     self.mode = Mode::Normal;
                 }
@@ -1312,6 +1337,21 @@ impl App {
             KeyCode::Enter => {
                 if self.editor.is_none() {
                     self.new_block_below();
+                    return;
+                }
+                // In a code block Enter is a newline. Splitting the block here
+                // would end the fence at the caret and leave the rest of the
+                // program in a sibling block as prose -- so this is the one case
+                // where Enter does not mean "new block".
+                if self
+                    .editor
+                    .as_ref()
+                    .map(|ed| crate::model::is_code(&ed.text()))
+                    .unwrap_or(false)
+                {
+                    if let Some(ed) = self.editor.as_mut() {
+                        ed.code_newline();
+                    }
                     return;
                 }
                 let id = self
@@ -1514,6 +1554,8 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("x dw d$ D", "delete char · word · to line end", "Text"),
     ("cw ciw C", "change word · to line end", "Text"),
     ("Ctrl-w / Ctrl-u", "delete word / to line start", "Insert"),
+    ("⏎ in a fence", "newline, indented like the line above", "Insert"),
+    ("↑ ↓ · gj gk", "move between the lines of one block", "Normal, Insert"),
     ("Inline completion", "", ""),
     ("/", "slash commands inside a block", "Insert"),
     ("[[ (( #", "page link · block ref · tag", "Insert"),

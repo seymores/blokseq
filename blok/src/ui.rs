@@ -361,7 +361,22 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
         ]));
     }
 
-    let tail: Vec<Line> = lines.into_iter().skip(0).collect();
+    // A tall block -- a code block, a long note -- can be several display rows
+    // past the bottom of the pane, and the caret with it. The outline scrolls by
+    // *block*, so without this the line you are typing falls off the screen and
+    // you finish it blind. Pulling the content up until the caret's row is
+    // visible is what a text editor does; the rows above it scroll away.
+    if let Some((cx, cy)) = edit_caret {
+        let bottom = inner.y + inner.height;
+        if cy >= bottom {
+            let drop = (cy + 1 - bottom) as usize;
+            lines.drain(0..drop.min(lines.len().saturating_sub(1)));
+            edit_caret = Some((cx, cy - drop as u16));
+            caret = edit_caret;
+        }
+    }
+
+    let tail: Vec<Line> = lines;
     f.render_widget(
         Paragraph::new(tail)
             .style(Theme::panel())
@@ -551,12 +566,22 @@ fn code_lines(
             } else {
                 vec![Span::styled(hang.clone(), Style::default().bg(bg))]
             };
+            let chars = chunk.chars().count();
             spans.push(Span::styled(chunk, text));
+            let mut used = prefix_w + chars;
             if i == 0 && j == 0 {
+                used += label.chars().count() + marker.chars().count();
                 spans.push(Span::styled(label.clone(), badge));
                 if !marker.is_empty() {
                     spans.push(Span::styled(marker.clone(), Style::default().fg(theme::FAINT).bg(bg)));
                 }
+            }
+            // The code background is a *region*, not a highlight of the text:
+            // without this the panel stops at the last character and the block
+            // reads like prose that happens to be grey.
+            let pad = width.saturating_sub(used);
+            if pad > 0 {
+                spans.push(Span::styled(" ".repeat(pad), Style::default().bg(bg)));
             }
             out.push(Line::from(spans));
         }
@@ -652,7 +677,8 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
     let text: String = ed.chars.iter().collect();
     // While the block is code, nothing inside it is markup -- including while
     // you type, which is also what stops `#include` from opening the tag menu.
-    let styled = if crate::model::is_code(&text) {
+    let code = crate::model::is_code(&text);
+    let styled = if code {
         code_styles(&ed.chars, bg)
     } else {
         styled_chars(app, &text, bg, true)
@@ -707,7 +733,16 @@ fn editor_lines(app: &App, ed: &Editor, width: usize, row: &Row) -> (Vec<Line<'s
             }
             caret = Some(((prefix_w + i) as u16, n as u16));
         }
+        let line_len = prefix_w + run.len();
         spans.extend(runs_to_spans(run));
+        // Code is a region, so its background runs to the edge of the pane. Prose
+        // keeps the highlight under the words, which is the older, quieter rule.
+        if code {
+            let pad = width.saturating_sub(line_len);
+            if pad > 0 {
+                spans.push(Span::styled(" ".repeat(pad), Style::default().bg(bg)));
+            }
+        }
         out.push(Line::from(spans));
     }
     (out, caret.unwrap_or((prefix_w as u16, 0)))
@@ -1921,6 +1956,23 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
         .map(|r| app.links_in(r.id).len())
         .unwrap_or(0);
     let pairs: Vec<(String, String)> = match app.mode {
+        // A code block has no inline menus and does not split on Enter, so its
+        // hints are about typing lines -- saying "⏎ new block" in a fence would
+        // be describing an app that is not this one.
+        Mode::Insert
+            if app
+                .editor
+                .as_ref()
+                .map(|ed| crate::model::is_code(&ed.text()))
+                .unwrap_or(false) =>
+        {
+            vec![
+                ("Esc".into(), "stop editing".into()),
+                ("⏎".into(), "newline".into()),
+                ("Tab / Shift-Tab".into(), "indent / dedent".into()),
+                ("↑ ↓".into(), "between lines".into()),
+            ]
+        }
         Mode::Insert => vec![
             ("Esc".into(), "stop editing".into()),
             ("⏎".into(), "new block".into()),
@@ -2714,6 +2766,42 @@ fn main() { println!(\"[[x]]\"); }
             assert_eq!(text.matches('x').count(), 300, "every character survives");
             assert!(text.contains("CODE · rust"), "and the badge is still there");
         }
+    }
+
+    /// A tall block scrolls so the line being typed stays on screen. The outline
+    /// scrolls by *block*, so without this the caret in a 30-line code block is
+    /// simply off the pane and the rest of it is typed blind.
+    #[test]
+    fn the_view_follows_the_caret_down_a_tall_block() {
+        let mut a = app("tall_block");
+        let page = a.db.ensure_page("Tall", PageKind::Page);
+        let body = (1..=30)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let id = a
+            .db
+            .create_block(page.id, None, None, &format!("```\n{body}\n```"))
+            .id;
+        a.db.create_block(page.id, None, None, "after the block");
+        a.goto_page("Tall");
+        a.begin_edit_block(id);
+        if let Some(ed) = a.editor.as_mut() {
+            ed.goto_line(28); // "line 28" of the body, near the bottom
+        }
+
+        let term = draw(&mut a, 80, 24);
+        assert!(
+            term.backend().cursor_visible(),
+            "the caret must be on screen to be typed at"
+        );
+        let at = term.backend().cursor_position();
+        assert!(at.y < 22, "above the status and hint rows: {at:?}");
+        let row = row_text(&term, 80, at.y);
+        assert!(row.contains("line 28"), "the caret's own line: {row:?}");
+        // The view scrolled: the fence at the top of the block is long gone.
+        let top = row_text(&term, 80, 1);
+        assert!(!top.contains("```"), "the block scrolled past its fence: {top:?}");
     }
 
     /// The help screen's two columns are split at a named section and headed

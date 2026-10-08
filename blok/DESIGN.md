@@ -527,9 +527,27 @@ the one piece of markup this app keeps.
 
 While you edit one, the fence *is* shown and coloured as a delimiter, because the
 fence is the markup and this app edits markup as text. The completion popups are
-off in there, so typing `#` in code cannot open the tag menu. `/Code` is the way
-in: it writes an unterminated fence with the caret on the line between the
-fences, and the language is yours to type — a default would be a guess.
+off in there, so typing `#` in code cannot open the tag menu.
+
+**Typing one.** `/Code` is the way in: it writes an unterminated fence with the
+caret on the line between the fences, and the language is yours to type — a
+default would be a guess. From there:
+
+* `⏎` is a **newline**, not a new block, and it is indented like the line you are
+  on. This is the one place Enter does not split the block, and it has to be: a
+  split ends the fence at the caret and leaves the rest of the program outside it
+  as prose. The closing fence needs no handling — it is below the caret, so it
+  moves down as the code grows.
+* If you type the fence by hand instead, `⏎` at the end of the opening line
+  brings the closing fence with it, so a block is never left half-open.
+* `Tab` / `Shift-Tab` indent and dedent the line the caret is on (two spaces per
+  press, one shiftwidth at a time, as `<<` works in vim).
+* `↑` `↓` (or `gj` `gk`) move between the lines of the block; `j`/`k` still walk
+  out of it, because one key should always leave.
+* The pane follows the caret, and so does the outline generally: it scrolls by
+  *block*, so a block taller than the pane would otherwise take the line you are
+  typing off the screen. The frame above is 60 lines into one, with its fence
+  scrolled away and the caret on the line being typed.
 
 ### 7.3 Structure edits
 
@@ -837,7 +855,7 @@ Being explicit about this matters more than the demo looking good.
   `fencing_a_block_removes_the_refs_it_had` (the fence's contract), plus
   `a_code_block_renders_its_body_under_a_badge` and the `Editor` unit tests for
   `indent`/`dedent`/`position`.
-* The key router is covered by 51 regression tests (`cargo test`), one per bug
+* The key router is covered by 57 regression tests (`cargo test`), one per bug
   this project has actually shipped: `q`/`ZZ`/`ZQ`/`:q` all end the session and
   commit an in-flight edit; one `Esc` always leaves editing; a tree motion leaves
   the block's text; `dd` + `u` round-trips a block; `Ctrl-]` and `gf` both follow
@@ -845,7 +863,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 31 frames in this document are the app's own renderer (31 frames, 51
+* All 31 frames in this document are the app's own renderer (31 frames, 57
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

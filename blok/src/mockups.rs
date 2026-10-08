@@ -751,7 +751,7 @@ fn cases() -> Vec<Case> {
             width: 118,
             height: 38,
             build: |app| {
-                seed_code(app);
+                seed_code(app, 8);
                 app.goto_page("SQLite");
                 // Select the prose block, so the code is drawn unselected and its
                 // own background is visible next to the prose one.
@@ -763,14 +763,16 @@ fn cases() -> Vec<Case> {
             width: 118,
             height: 38,
             build: |app| {
-                seed_code(app);
+                // Long enough that the pane has to scroll to keep the caret on
+                // screen: this frame is about typing the fortieth line, not the
+                // first one.
+                seed_code(app, 60);
                 app.goto_page("SQLite");
                 app.select_containing("let page = db");
                 app.begin_edit();
-                // Somewhere in the middle of a line of code, which is where the
-                // caret lives most of the time in a code block.
                 if let Some(ed) = app.editor.as_mut() {
-                    ed.cursor = "```rust\nlet page = db.page_by_name(\"SQL".chars().count();
+                    ed.goto_line(50);
+                    ed.end();
                 }
             },
         },
@@ -794,13 +796,27 @@ fn cases() -> Vec<Case> {
 /// A code block, added by the frames that are about code rather than by the
 /// shared seed: the pages a fence demonstrates are not the pages the rest of
 /// the frames are about, and a fixture nobody else uses cannot shift one.
-fn seed_code(app: &mut App) {
+fn seed_code(app: &mut App, lines: usize) {
     let sqlite = app.db.ensure_page("SQLite", PageKind::Page);
+    let mut body = vec![
+        "let page = db.page_by_name(\"SQLite\")?; // [[not a link]]".to_string(),
+        "// #not a tag, and id:: is not a property".to_string(),
+        "for (i, b) in db.page_blocks(page.id).iter().enumerate() {".to_string(),
+        "    println!(\"{:>6}  {}\", b.id, snippet(&b.content, 40));".to_string(),
+        "    if i % 100 == 0 {".to_string(),
+        "        stdout().flush()?;".to_string(),
+        "    }".to_string(),
+        "}".to_string(),
+    ];
+    while body.len() < lines {
+        body.push(format!("// line {} of the snippet", body.len() + 1));
+    }
+    body.truncate(lines.max(1));
     app.db.create_block(
         sqlite.id,
         None,
         None,
-        "```rust\nlet page = db.page_by_name(\"SQLite\")?; // [[not a link]]\n// #not a tag, and id:: is not a property\nfor b in db.page_blocks(page.id) {\n    println!(\"{:>6}  {}\", b.id, b.content);\n}\n```",
+        &format!("```rust\n{}\n```", body.join("\n")),
     );
     app.db.refresh_stats();
     app.reload();

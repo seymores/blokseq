@@ -2,12 +2,12 @@
 │▌• WAL, FTS5, VACUUM INTO, fractional indexing                                                                                            │
 │ • let page = db.page_by_name("SQLite")?; // [[not a link]]  CODE · rust                                                                  │
 │   // #not a tag, and id:: is not a property                                                                                              │
-│   for b in db.page_blocks(page.id) {                                                                                                     │
-│       println!("{:>6}  {}", b.id, b.content);                                                                                            │
+│   for (i, b) in db.page_blocks(page.id).iter().enumerate() {                                                                             │
+│       println!("{:>6}  {}", b.id, snippet(&b.content, 40));                                                                              │
+│       if i % 100 == 0 {                                                                                                                  │
+│           stdout().flush()?;                                                                                                             │
+│       }                                                                                                                                  │
 │   }                                                                                                                                      │
-│                                                                                                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │

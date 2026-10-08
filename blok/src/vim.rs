@@ -1329,6 +1329,14 @@ impl App {
                 "w" => ed.word_right(),
                 "b" => ed.word_left(),
                 "e" => ed.word_end(),
+                // vim's display-line motions, which here are the only way to
+                // move *within* a block without leaving it.
+                "gj" => {
+                    ed.line_down();
+                }
+                "gk" => {
+                    ed.line_up();
+                }
                 "0" => ed.home(),
                 "^" => ed.first_non_blank(),
                 "$" => ed.end(),
@@ -2011,5 +2019,157 @@ mod tests {
             "there is no previous sibling at this level, so nothing moves"
         );
         assert!(a.db.block(id).and_then(|b| b.parent_id).is_some());
+    }
+
+    /// Report: "How to edit or input multiline codeblock?" The answer used to be
+    /// "press Alt-Enter for every line, and do not press Enter" -- Enter split
+    /// the block, which cut the fence in half and left the rest of the program
+    /// outside it as prose. In a code block Enter is now a newline, indented like
+    /// the line you are on, and the closing fence simply moves down.
+    #[test]
+    fn enter_in_a_code_block_adds_a_line_instead_of_splitting_it() {
+        let mut a = app("code_multiline");
+        code(&mut a, KeyCode::Enter);
+        key(&mut a, 'i');
+        for c in "/Code".chars() {
+            key(&mut a, c);
+        }
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.editor.as_ref().unwrap().text(), "```\n\n```");
+        assert_eq!(a.rows.len(), 2, "still two blocks: nothing was split");
+
+        for c in "fn main() {".chars() {
+            key(&mut a, c);
+        }
+        code(&mut a, KeyCode::Enter);
+        for c in "    let x = 1;".chars() {
+            key(&mut a, c);
+        }
+        code(&mut a, KeyCode::Enter);
+        // The new line is indented like the one above it, and Shift-Tab takes
+        // back one step at a time (2 spaces each, as in vim: one shiftwidth per
+        // press), which is what closing a brace looks like.
+        code(&mut a, KeyCode::BackTab);
+        code(&mut a, KeyCode::BackTab);
+        key(&mut a, '}');
+
+        let ed = a.editor.as_ref().unwrap();
+        assert_eq!(
+            ed.text(),
+            "```\nfn main() {\n    let x = 1;\n}\n```",
+            "the fence is intact and the closing fence moved down"
+        );
+        assert_eq!(a.rows.len(), 2, "one block, however many lines it has");
+        assert_eq!(ed.position(), (4, 2), "the caret is inside the fence");
+
+        // And it commits as one block with real newlines in it.
+        code(&mut a, KeyCode::Esc);
+        let id = a.rows[0].id;
+        let content = a.db.block(id).map(|b| b.content).unwrap_or_default();
+        assert!(content.contains("let x = 1;"), "{content}");
+        assert!(content.ends_with("```"), "{content}");
+    }
+
+    /// Enter keeps the line's indentation, which is the whole reason to have it
+    /// in code rather than a bare newline.
+    #[test]
+    fn code_newlines_keep_the_line_indentation() {
+        let mut a = app("code_indent");
+        let id = a.rows[0].id;
+        a.begin_edit_block(id);
+        if let Some(ed) = a.editor.as_mut() {
+            ed.set_text("```\n    deep()\n```");
+            ed.goto_line(1);
+            ed.end();
+        }
+        code(&mut a, KeyCode::Enter);
+        key(&mut a, 'x');
+        let ed = a.editor.as_ref().unwrap();
+        assert_eq!(ed.text(), "```\n    deep()\n    x\n```");
+    }
+
+    /// Typing the fence by hand: Enter at the end of the opening line brings the
+    /// closing fence with it, so a code block is never left half-open.
+    #[test]
+    fn enter_after_a_hand_typed_fence_closes_it() {
+        let mut a = app("code_hand");
+        let id = a.rows[0].id;
+        a.begin_edit_block(id);
+        if let Some(ed) = a.editor.as_mut() {
+            ed.set_text("```rust");
+            ed.cursor = ed.chars.len();
+        }
+        code(&mut a, KeyCode::Enter);
+        let ed = a.editor.as_ref().unwrap();
+        assert_eq!(ed.text(), "```rust\n\n```");
+        assert_eq!(ed.position(), (2, 1), "and the caret is between the fences");
+    }
+
+    /// In NORMAL mode the arrows move *within* the block, and `j`/`k` still walk
+    /// out of it. Before this, Up/Down were `k`/`j`, so a multi-line block could
+    /// not be navigated at all without going back into INSERT.
+    #[test]
+    fn arrows_move_inside_the_block_without_leaving_it() {
+        let mut a = app("code_arrows");
+        let id = a.rows[0].id;
+        a.begin_edit_block(id);
+        if let Some(ed) = a.editor.as_mut() {
+            ed.set_text("one\ntwo\nthree");
+            ed.goto_line(0);
+        }
+        code(&mut a, KeyCode::Esc); // NORMAL, caret still in the block
+        assert!(a.text_focus);
+        code(&mut a, KeyCode::Down);
+        assert_eq!(a.editor.as_ref().unwrap().position(), (2, 1));
+        code(&mut a, KeyCode::Down);
+        assert_eq!(a.editor.as_ref().unwrap().position(), (3, 1));
+        code(&mut a, KeyCode::Down);
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (3, 1),
+            "the last line is the last line"
+        );
+        code(&mut a, KeyCode::Up);
+        assert_eq!(a.editor.as_ref().unwrap().position(), (2, 1));
+        assert!(a.text_focus, "and we never left the block");
+
+        // `gj`/`gk` are the vim spelling of the same two motions.
+        key(&mut a, 'g');
+        key(&mut a, 'k');
+        assert_eq!(a.editor.as_ref().unwrap().position(), (1, 1));
+        assert!(a.text_focus);
+
+        // `j` alone is still the way out.
+        key(&mut a, 'j');
+        assert!(!a.text_focus, "`j` leaves the block, as it always did");
+    }
+
+    /// `Esc` used to hand the caret to the end of the block: committing takes the
+    /// buffer, and the reload rebuilt it with the cursor at `chars.len()`. In a
+    /// multi-line block that means losing your place every time you stop typing.
+    #[test]
+    fn escape_keeps_the_caret_where_it_was() {
+        let mut a = app("esc_caret");
+        let id = a.rows[0].id;
+        a.begin_edit_block(id);
+        if let Some(ed) = a.editor.as_mut() {
+            ed.set_text("alpha\nbeta\ngamma");
+            ed.goto_line(1);
+            ed.cursor += 2; // two characters into "beta"
+        }
+        assert_eq!(a.editor.as_ref().unwrap().position(), (2, 3));
+
+        code(&mut a, KeyCode::Esc);
+        assert!(a.text_focus);
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (2, 3),
+            "the caret is where it was, not at the end of the text"
+        );
+
+        // And a second Esc drops the caret entirely, as documented.
+        code(&mut a, KeyCode::Esc);
+        assert!(!a.text_focus);
+        assert!(a.editor.is_none());
     }
 }

@@ -111,9 +111,13 @@ impl Editor {
         self.chars.iter().collect()
     }
 
+    /// Replace the buffer outright. Dirty by definition: a buffer that was
+    /// changed and not marked dirty is how a test can spend a whole run editing
+    /// text that gets thrown away at the next `Esc`.
     pub fn set_text(&mut self, text: &str) {
         self.chars = text.chars().collect();
         self.cursor = self.chars.len().min(self.cursor);
+        self.dirty = true;
     }
 
     pub fn before_cursor(&self) -> String {
@@ -267,6 +271,43 @@ impl Editor {
         };
         self.dirty = true;
         self.anchor = None;
+    }
+
+    /// `Enter` inside a code block: a new line, indented like the one the caret
+    /// is on.
+    ///
+    /// Splitting the block -- what Enter means in prose -- would cut the fence in
+    /// half and leave the rest of the program outside it, so this is the one
+    /// place Enter does not mean "new block". The closing fence needs no
+    /// handling: it is below the caret, so it simply moves down.
+    pub fn code_newline(&mut self) {
+        let start = self.home_index();
+        let indent: String = self.chars[start..self.cursor]
+            .iter()
+            .take_while(|c| **c == ' ')
+            .collect();
+        // Typing the fence by hand: Enter at the end of the opening line brings
+        // the closing fence with it, so a code block is never left half-open.
+        let fence_and_nothing_else = start == 0
+            && self.cursor == self.chars.len()
+            && !self.chars.contains(&'\n')
+            && self.chars.starts_with(&['`', '`', '`']);
+        if fence_and_nothing_else {
+            self.insert_str("\n\n```");
+            // Land on the blank line *between* the fences, not after the last one.
+            self.cursor -= 4;
+            return;
+        }
+        self.insert_str("\n");
+        self.insert_str(&indent);
+    }
+
+    /// Is the caret on a line of its own inside a code block? (Not used by the
+    /// editor itself; the renderer and the key router ask the same question.)
+    pub fn on_blank_line(&self) -> bool {
+        let start = self.home_index();
+        let end = self.end_of_line();
+        self.chars[start..end].iter().all(|c| *c == ' ')
     }
 
     /// Put the cursor at the start of 0-based line `n`, clamped to the last line.
