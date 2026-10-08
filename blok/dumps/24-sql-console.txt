@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL  blocks  ·  read-only. `.tables` · `.schema blocks` · any SELECT or PRAGMA  ·  block #21                      no snapshot yet — :w
- ⏎ run   .tables list tables   ↑↓ history   Ctrl-l clear   Esc leave
+ ⏎ run   .tables list tables   ↑↓ history   Esc leave

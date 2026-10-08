@@ -39,4 +39,4 @@
 │                                              ││                                            ││                                            │
 ╰──────────────────────────────────────────────╯╰────────────────────────────────────────────╯╰────────────────────────────────────────────╯
  NORMAL  blocks  ·  3 columns · live query  ·  block #21                                                              no snapshot yet — :w
- j/k rows   ⏎ jump to block   Esc back
+ h/l columns   j/k rows   ⏎ jump to the block   Esc back

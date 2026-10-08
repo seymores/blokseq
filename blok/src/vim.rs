@@ -102,39 +102,33 @@ impl App {
         self.mode = Mode::Insert;
     }
 
-    /// `Enter` in Normal mode: the cursor moves *into* the block's text and
-    /// stays in Normal mode -- the position vim leaves you in after `Esc`.
+    /// `Enter` in Normal mode: put the caret in this block's text, still in
+    /// Normal mode. Text motions work from here (`w`, `x`, `dw`); `j`/`k` walk
+    /// back out to the block list, so this is a cursor position and not a state
+    /// you can get stuck in.
     pub fn enter_text(&mut self) {
         let Some(row) = self.selected_row().cloned() else {
             return;
         };
         self.begin_edit_block(row.id);
         if let Some(ed) = self.editor.as_mut() {
-            ed.mode = Mode::Text;
             ed.first_non_blank();
         }
-        self.mode = Mode::Text;
+        self.text_focus = true;
+        self.mode = Mode::Normal;
     }
 
-    fn text_hop(&mut self, down: bool) {
-        let Some(id) = self.editor.as_ref().map(|e| e.block_id) else {
-            return;
-        };
-        self.commit_edit();
-        self.select_block(id);
-        let before = self.selected;
-        self.move_selection(if down { 1 } else { -1 });
-        if self.selected == before {
-            // no neighbour: clamp the cursor inside the block instead
-            self.begin_edit_block(id);
-            if let Some(ed) = self.editor.as_mut() {
-                ed.mode = Mode::Text;
-                ed.cursor = if down { ed.chars.len() } else { 0 };
+    /// Leave the block's text but keep the row selected (used by every tree
+    /// motion, so a single `j` is always enough to get back to the blocks).
+    fn leave_text(&mut self) {
+        if self.text_focus {
+            let id = self.editor.as_ref().map(|e| e.block_id);
+            self.commit_edit();
+            if let Some(id) = id {
+                self.select_block(id);
             }
-            self.mode = Mode::Text;
-            return;
+            self.text_focus = false;
         }
-        self.enter_text();
     }
 
     /// `o` / `O`.
@@ -1246,6 +1240,14 @@ impl App {
                 _ => {}
             }
         }
+        // With the caret inside a block, vim's text grammar applies first.
+        // Anything it does not handle leaves the text and runs as a tree
+        // command, which is what makes `j` (or any other motion) a one-key
+        // escape from the block's text.
+        if self.text_focus && self.text_op(seq) {
+            return true;
+        }
+        self.leave_text();
         match seq {
             "j" => self.move_selection(1),
             "k" => self.move_selection(-1),
@@ -1260,6 +1262,7 @@ impl App {
             "C-p" => self.open_palette(),
             "C-r" => self.redo(),
             "C-]" => self.follow_link(),
+            "gf" => self.follow_link(),
             "C-o" | "C-t" => self.history_back(),
             "C-i" => self.history_forward(),
             "C-s" => {
@@ -1310,157 +1313,80 @@ impl App {
         true
     }
 
-    /// Normal mode with the cursor inside one block's text.
-    pub fn text_key(&mut self, k: KeyEvent, ctrl: bool) {
-        let Some(name) = key_name(k, ctrl) else { return };
-        if !self.pending.is_empty() {
-            let seq = format!("{}{}", self.pending, name);
-            self.pending.clear();
-            if self.text_command(&seq) {
-                return;
-            }
-            if self.text_command(&name) {
-                return;
-            }
-            self.unknown_key(&seq);
-            return;
-        }
-        if matches!(name.as_str(), "d" | "c" | "g") {
-            self.pending = name;
-            return;
-        }
-        if !self.text_command(&name) {
-            self.unknown_key(&name);
-        }
-    }
-
-    pub fn text_command(&mut self, seq: &str) -> bool {
-        // Vertical motion may walk off the block; that means the neighbouring
-        // block, which is what `j` does at the last line of a file in vim.
-        if seq == "j" || seq == "k" {
-            let down = seq == "j";
-            let moved = match self.editor.as_mut() {
-                Some(ed) => {
-                    if down {
-                        ed.line_down()
-                    } else {
-                        ed.line_up()
-                    }
-                }
-                None => false,
-            };
-            if !moved {
-                self.text_hop(down);
-            }
-            return true;
-        }
+    /// Vim's text grammar, applied to the block the caret is in. Returns false
+    /// for anything that is not a text operation, so the caller can treat the
+    /// key as a tree command instead.
+    fn text_op(&mut self, seq: &str) -> bool {
         if self.editor.is_none() {
-            self.mode = Mode::Normal;
-            return true;
+            return false;
         }
-        if seq == "gg" {
-            if let Some(ed) = self.editor.as_mut() {
-                ed.cursor = 0;
-            }
-            return true;
-        }
-        if seq == "G" {
-            if let Some(ed) = self.editor.as_mut() {
-                ed.cursor = ed.chars.len();
-            }
-            return true;
-        }
-        let ed = self.editor.as_mut().unwrap();
-        match seq {
-            "h" => ed.left(),
-            "l" => ed.right(),
-            "w" => ed.word_right(),
-            "b" => ed.word_left(),
-            "e" => ed.word_end(),
-            "0" => ed.home(),
-            "^" => ed.first_non_blank(),
-            "$" => ed.end(),
-            "x" => ed.delete_char(),
-            "D" | "d$" => ed.delete_to_end(),
-            "dw" => ed.delete_word(),
-            "d0" => {
-                let mut home = ed.cursor;
-                while home > 0 && ed.chars[home - 1] != '\n' {
-                    home -= 1;
+        let mut start_inserting = false;
+        let mut drop_caret = false;
+        let mut quit = false;
+        {
+            let ed = self.editor.as_mut().unwrap();
+            match seq {
+                "h" => ed.left(),
+                "l" => ed.right(),
+                "w" => ed.word_right(),
+                "b" => ed.word_left(),
+                "e" => ed.word_end(),
+                "0" => ed.home(),
+                "^" => ed.first_non_blank(),
+                "$" => ed.end(),
+                "x" => ed.delete_char(),
+                "D" | "d$" => ed.delete_to_end(),
+                "dw" => ed.delete_word(),
+                "d0" => {
+                    let mut home = ed.cursor;
+                    while home > 0 && ed.chars[home - 1] != '\n' {
+                        home -= 1;
+                    }
+                    ed.chars.drain(home..ed.cursor);
+                    ed.cursor = home;
+                    ed.dirty = true;
                 }
-                ed.chars.drain(home..ed.cursor);
-                ed.cursor = home;
-                ed.dirty = true;
-            }
-            "cw" | "ciw" => {
-                ed.change_word();
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "C" => {
-                ed.change_to_end();
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "dd" => {
-                self.commit_edit();
-                self.delete_selected();
-            }
-            "i" => {
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "a" => {
-                ed.right();
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "I" => {
-                ed.home();
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "A" => {
-                ed.end();
-                ed.mode = Mode::Insert;
-                self.mode = Mode::Insert;
-            }
-            "o" => {
-                self.commit_edit();
-                self.open_sibling(false);
-            }
-            "O" => {
-                self.commit_edit();
-                self.open_sibling(true);
-            }
-            "u" => {
-                self.commit_edit();
-                self.undo();
-            }
-            "C-r" => {
-                self.commit_edit();
-                self.redo();
-            }
-            "C-]" => {
-                self.commit_edit();
-                self.follow_link();
-            }
-            "<CR>" => {
-                let moved = ed.line_down();
-                if !moved {
-                    ed.mode = Mode::Insert;
-                    self.mode = Mode::Insert;
+                "cw" | "ciw" => {
+                    ed.change_word();
+                    start_inserting = true;
                 }
+                "C" => {
+                    ed.change_to_end();
+                    start_inserting = true;
+                }
+                "i" => start_inserting = true,
+                "a" => {
+                    ed.right();
+                    start_inserting = true;
+                }
+                "I" => {
+                    ed.home();                    start_inserting = true;
+                }
+                "A" => {
+                    ed.end();
+                    start_inserting = true;
+                }
+                // In a block, Enter means "start typing here" -- `o` is the
+                // key that opens a new block, and the hint bar says so.
+                "<CR>" => start_inserting = true,
+                "<Esc>" => drop_caret = true,
+                // Same as everywhere in Normal mode: `q` quits.
+                "q" => quit = true,
+                _ => return false,
             }
-            "<Esc>" => {
-                let id = ed.block_id;
-                self.commit_edit();
-                self.select_block(id);
-                self.mode = Mode::Normal;
+        }
+        if quit {
+            self.quit_now(true, false);
+            return true;
+        }
+        if start_inserting {
+            if let Some(ed) = self.editor.as_mut() {
+                ed.mode = Mode::Insert;
             }
-            // The same deviation as in NORMAL mode, and it commits first.
-            "q" => self.quit_now(true, false),
-            _ => return false,
+            self.mode = Mode::Insert;
+        }
+        if drop_caret {
+            self.leave_text();
         }
         true
     }
@@ -1576,8 +1502,8 @@ mod tests {
     #[test]
     fn q_while_typing_commits_before_quitting() {
         let mut a = app("q_commits");
-        code(&mut a, KeyCode::Enter); // NORMAL -> TEXT
-        assert_eq!(a.mode, Mode::Text);
+        code(&mut a, KeyCode::Enter); // caret into the block
+        assert!(a.text_focus);
         let id = a.rows[0].id;
         // A dirty buffer, however it got that way.
         if let Some(ed) = a.editor.as_mut() {
@@ -1595,7 +1521,7 @@ mod tests {
     #[test]
     fn q_in_insert_mode_types_a_q() {
         let mut a = app("q_insert");
-        code(&mut a, KeyCode::Enter); // NORMAL -> TEXT
+        code(&mut a, KeyCode::Enter); // caret into the block
         key(&mut a, 'i'); // -> INSERT
         key(&mut a, 'q');
         assert!(!a.quit, "in INSERT, `q` is a character, exactly as in vim");
@@ -1607,16 +1533,93 @@ mod tests {
     }
 
     #[test]
-    fn esc_walks_the_vim_ladder() {
-        let mut a = app("esc_ladder");
+    fn one_escape_always_leaves_editing() {
+        let mut a = app("esc_once");
         code(&mut a, KeyCode::Enter);
-        assert_eq!(a.mode, Mode::Text);
+        assert!(a.text_focus, "Enter puts the caret in the block");
+        assert_eq!(a.mode, Mode::Normal, "and does not change the mode");
         key(&mut a, 'i');
         assert_eq!(a.mode, Mode::Insert);
         code(&mut a, KeyCode::Esc);
-        assert_eq!(a.mode, Mode::Text, "Esc from INSERT lands in TEXT");
+        assert_eq!(a.mode, Mode::Normal, "one Esc leaves INSERT");
+        assert!(a.text_focus, "the caret stays where it was");
         code(&mut a, KeyCode::Esc);
-        assert_eq!(a.mode, Mode::Normal, "Esc from TEXT lands in NORMAL");
+        assert!(!a.text_focus, "a second Esc drops the caret");
+    }
+
+    #[test]
+    fn a_tree_motion_leaves_the_block_text() {
+        let mut a = app("motion_leaves");
+        code(&mut a, KeyCode::Enter);
+        assert!(a.text_focus);
+        let first = a.selected;
+        key(&mut a, 'j');
+        assert!(!a.text_focus, "j must not leave the caret stuck in the block");
+        assert_eq!(a.selected, first + 1, "and it must still move");
+    }
+
+    #[test]
+    fn gf_and_ctrl_bracket_both_follow_links() {
+        for (name, keys) in [("gf", vec!['g', 'f']), ("ctrl-bracket", vec![])] {
+            let mut a = app(&format!("follow_{}", name));
+            a.selected = 1; // "second block with [[Test Page]]"
+            if keys.is_empty() {
+                ctrl(&mut a, ']');
+            } else {
+                for k in keys {
+                    key(&mut a, k);
+                }
+            }
+            assert_eq!(a.view, View::Page("Test Page".into()), "{name} follows");
+        }
+    }
+
+    #[test]
+    fn ctrl_p_opens_any_page() {
+        let mut a = app("page_picker");
+        ctrl(&mut a, 'p');
+        assert!(a.palette.is_some(), "Ctrl-P opens the page picker");
+        // typing filters
+        for c in "Test".chars() {
+            key(&mut a, c);
+        }
+        let filtered = a.palette.as_ref().map(|p| p.filtered.len()).unwrap_or(0);
+        assert!(filtered >= 1, "the query filters the list");
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.view, View::Page("Test Page".into()));
+    }
+
+    #[test]
+    fn ctrl_w_h_reaches_the_sidebar_and_enter_opens() {
+        let mut a = app("sidebar_focus");
+        assert!(a.show_sidebar);
+        ctrl(&mut a, 'w');
+        key(&mut a, 'h');
+        assert_eq!(a.focus, Focus::Sidebar, "Ctrl-w h focuses the pages panel");
+        // j/k move the selection, Enter opens whatever is selected
+        key(&mut a, 'j');
+        code(&mut a, KeyCode::Enter);
+        assert_eq!(a.focus, Focus::Main, "Enter returns to the blocks");
+    }
+
+    #[test]
+    fn hints_are_contextual() {
+        let a = app("hints");
+        // The block with a link exists, so the hint bar must be able to say so.
+        let row = a.rows.iter().find(|r| r.content.contains("[[")).cloned();
+        assert!(row.is_some(), "the fixture has a linking block");
+        let links = row.map(|r| a.links_in(r.id).len()).unwrap_or(0);
+        assert_eq!(links, 1);
+    }
+
+    #[test]
+    fn a_message_clears_on_the_next_keypress() {
+        let mut a = app("message_clears");
+        key(&mut a, 'd');
+        key(&mut a, 'd'); // dd deletes, and reports it
+        assert!(a.toast.is_some(), "an action reports what it did");
+        key(&mut a, 'j');
+        assert!(a.toast.is_none(), "the next keypress clears the message");
     }
 
     #[test]

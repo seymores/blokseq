@@ -15,15 +15,17 @@ use crate::theme::{self, Theme};
 
 pub fn render(f: &mut Frame, app: &mut App) {
     let area = f.area();
-    // The command line takes a row from the body while it is open, exactly like
-    // vim's cmdline.
+    // The command line, and a one-line message area, take rows from the body
+    // while they are in use -- vim's cmdline and `:echo`, not a floating box.
     let ex_h = if app.ex.is_some() { 1 } else { 0 };
+    let msg_h = if app.toast.is_some() { 1 } else { 0 };
     let chunks = Layout::vertical([
-        Constraint::Length(1),        // title bar
-        Constraint::Min(4),           // body
-        Constraint::Length(ex_h),     // : command line
-        Constraint::Length(1),        // status
-        Constraint::Length(1),        // hints
+        Constraint::Length(1),     // title bar
+        Constraint::Min(4),        // body
+        Constraint::Length(msg_h), // what just happened; any key clears it
+        Constraint::Length(ex_h),  // : command line
+        Constraint::Length(1),     // status
+        Constraint::Length(1),     // hints
     ])
     .split(area);
 
@@ -61,12 +63,14 @@ pub fn render(f: &mut Frame, app: &mut App) {
     if let Some(p) = app.palette.clone() {
         render_palette(f, app, &p, chunks[1]);
     }
-    if ex_h > 0 {
-        render_ex(f, app, chunks[2]);
+    if msg_h > 0 {
+        render_message(f, app, chunks[2]);
     }
-    render_status(f, app, chunks[3]);
-    render_hints(f, app, chunks[4]);
-    render_toast(f, app, chunks[1]);
+    if ex_h > 0 {
+        render_ex(f, app, chunks[3]);
+    }
+    render_status(f, app, chunks[4]);
+    render_hints(f, app, chunks[5]);
 }
 
 // ---------------------------------------------------------------- title bar
@@ -166,17 +170,22 @@ fn render_titlebar(f: &mut Frame, app: &App, area: Rect) {
 /// outline takes the space -- panels are preferences, not furniture.
 fn render_workspace(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16)> {
     let w = area.width;
+    // The sidebar needs ~20 columns to be worth having; below that it is off.
+    // Hiding a panel is the user's decision (Ctrl-n / :set nosidebar), not
+    // something a 79-column terminal does behind their back.
     let left_w = if !app.show_sidebar {
         0
     } else if w >= 120 {
         28
     } else if w >= 100 {
         26
-    } else if w >= 84 {
+    } else if w >= 72 {
         22
     } else {
         0
     };
+    // References carry real text, so they need real width; below ~96 columns
+    // they crowd the outline and go away, and the status bar says so.
     let right_w = if !app.show_refs {
         0
     } else if w >= 150 {
@@ -671,6 +680,9 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
 
     let prefix_w = prefix_width(&prefix);
     let text_w = width.saturating_sub(prefix_w);
+    // A block with links says so, so that "can I go somewhere from here?" is
+    // answerable by looking. `Ctrl-]` / `gf` follows them.
+    let links = crate::model::parse_refs(&row.content).len();
     let mut out: Vec<Line> = Vec::new();
     // Alt-Enter puts real newlines inside one block; render them as continuation
     // lines that hang under the text, not under the bullet.
@@ -681,6 +693,14 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
             vec![Span::styled(" ".repeat(prefix_w), Style::default().bg(bg))]
         };
         spans.extend(inline_spans(app, para, text_w, bg, selected));
+        if i == 0 && links > 0 {
+            spans.push(Span::styled(
+                format!(" ↗{}", links),
+                Style::default()
+                    .fg(if selected { theme::ACCENT } else { theme::FAINT })
+                    .bg(bg),
+            ));
+        }
         if i == 0 && row.collapsed && row.has_children {
             spans.push(Span::styled(
                 format!("  ▸ {} collapsed", row.child_count),
@@ -1707,7 +1727,6 @@ fn render_help(f: &mut Frame, app: &App, area: Rect) {
 fn render_status(f: &mut Frame, app: &App, area: Rect) {
     let mode_color = match app.mode {
         Mode::Normal => theme::ACCENT,
-        Mode::Text => theme::CYAN,
         Mode::Insert => theme::GREEN,
         Mode::Visual => theme::PURPLE,
     };
@@ -1723,6 +1742,14 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled(" ", Theme::statusbar()),
     ];
+    if app.text_focus && app.mode == Mode::Normal {
+        // A cursor inside the block, not a mode: say so, and say how to leave.
+        spans.push(Span::styled(
+            " in block ",
+            Style::default().fg(theme::BG).bg(theme::CYAN).bold(),
+        ));
+        spans.push(Span::styled(" ", Theme::statusbar()));
+    }
     if !app.pending.is_empty() {
         spans.push(Span::styled(
             format!(" {} ", app.pending),
@@ -1814,114 +1841,151 @@ fn render_status(f: &mut Frame, app: &App, area: Rect) {
     );
 }
 
+/// The hint bar, computed from what is actually possible *right now*: which
+/// mode, whether the caret is in a block, which pane has focus, and whether the
+/// selected block even has links to follow. This is the app's own manual.
 fn render_hints(f: &mut Frame, app: &App, area: Rect) {
-    let pairs: Vec<(&str, &str)> = match app.mode {
+    let links = app
+        .selected_row()
+        .map(|r| app.links_in(r.id).len())
+        .unwrap_or(0);
+    let pairs: Vec<(String, String)> = match app.mode {
         Mode::Insert => vec![
-            ("Esc", "→ text normal"),
-            ("⏎", "split block"),
-            ("Alt-⏎", "newline in block"),
-            ("/", "commands"),
-            ("[[", "link page"),
-            ("((", "block ref"),
-            ("#", "tag"),
-            ("Ctrl-w", "del word"),
-            ("↑↓", "popup"),
+            ("Esc".into(), "stop editing".into()),
+            ("⏎".into(), "new block".into()),
+            ("Alt-⏎".into(), "newline in this block".into()),
+            ("/".into(), "commands".into()),
+            ("[[".into(), "link page".into()),
+            ("((".into(), "block ref".into()),
+            ("#".into(), "tag".into()),
         ],
-        Mode::Text => vec![
-            ("Esc", "→ blocks"),
-            ("w b e", "words"),
-            ("0 ^ $", "line"),
-            ("x dw d$", "delete"),
-            ("cw C", "change"),
-            ("i a A", "insert"),
-            ("o O", "new block"),
-            ("dd", "delete block"),
-            ("Ctrl-]", "follow link"),
-            ("Ctrl-o", "back"),
-        ],
-        Mode::Normal => match app.view {
-            View::Journal(_) | View::Page(_) => vec![
-                ("j/k", "blocks"),
-                ("h/l", "parent/child"),
-                ("⏎", "into text"),
-                ("i", "insert"),
-                ("o/O", "new block"),
-                ("dd/yy/p", "cut, copy, paste"),
-                (">>/<<", "indent"),
-                ("za", "fold"),
-                ("Ctrl-]", "follow link"),
-                ("v", "visual"),
-                (":", "commands"),
-                ("Ctrl-n/b", "panels"),
-                ("?", "help"),
-            ],
-            View::Search => vec![("/", "type"), ("↑↓", "results"), ("⏎", "open"), ("Esc", "back")],
-            View::Query => vec![("j/k", "rows"), ("⏎", "jump to block"), ("Esc", "back")],
-            View::Backup => vec![("Ctrl-S", "snapshot"), (":sql", "console"), ("Esc", "back")],
-            View::Help => vec![("Esc", "back"), ("q", "quit")],
-            View::Sql => vec![
-                ("⏎", "run"),
-                (".tables", "list tables"),
-                ("↑↓", "history"),
-                ("Ctrl-l", "clear"),
-                ("Esc", "leave"),
-            ],
-        },
         Mode::Visual => vec![
-            ("j/k", "extend"),
-            ("> <", "indent / outdent"),
-            ("d", "delete"),
-            ("y", "yank"),
-            ("J/K", "reorder"),
-            ("Esc", "leave"),
+            ("j/k".into(), "extend the range".into()),
+            ("> <".into(), "indent / outdent".into()),
+            ("d".into(), "delete".into()),
+            ("y".into(), "yank".into()),
+            ("Esc".into(), "leave".into()),
         ],
+        Mode::Normal => match app.focus {
+            Focus::Sidebar => vec![
+                ("j/k".into(), "pages and journals".into()),
+                ("⏎".into(), "open".into()),
+                ("Ctrl-P".into(), "open any page".into()),
+                ("Esc".into(), "back to the blocks".into()),
+            ],
+            Focus::Right => vec![
+                ("j/k".into(), "references".into()),
+                ("⏎".into(), "open the referencing block".into()),
+                ("Esc".into(), "back to the blocks".into()),
+            ],
+            Focus::Main => match app.view {
+                View::Journal(_) | View::Page(_) if app.text_focus => vec![
+                    ("j/k".into(), "back to the blocks".into()),
+                    ("w b e 0 $".into(), "move".into()),
+                    ("x dw cw".into(), "delete, change".into()),
+                    ("⏎ i a".into(), "type".into()),
+                    ("o".into(), "new block".into()),
+                    ("Ctrl-]".into(), "follow link".into()),
+                    ("Esc".into(), "drop the caret".into()),
+                ],
+                View::Journal(_) | View::Page(_) => {
+                    let mut v: Vec<(String, String)> = Vec::new();
+                    if links > 0 {
+                        v.push((
+                            "Ctrl-]".into(),
+                            format!(
+                                "follow {} link{}",
+                                links,
+                                if links == 1 { "" } else { "s" }
+                            ),
+                        ));
+                    }
+                    v.extend([
+                        ("j/k".into(), "blocks".into()),
+                        ("⏎ / i".into(), "edit this block".into()),
+                        ("o".into(), "new block".into()),
+                        ("h/l".into(), "parent / children".into()),
+                        ("za".into(), "fold".into()),
+                        ("Ctrl-P".into(), "open page".into()),
+                        ("Ctrl-w h".into(), "pages panel".into()),
+                        ("/".into(), "search".into()),
+                        (":".into(), "commands".into()),
+                        ("?".into(), "all keys".into()),
+                    ]);
+                    v
+                }
+                View::Search => vec![
+                    ("type".into(), "search every block".into()),
+                    ("↑↓".into(), "results".into()),
+                    ("⏎".into(), "open".into()),
+                    ("Esc".into(), "back".into()),
+                ],
+                View::Query => vec![
+                    ("h/l".into(), "columns".into()),
+                    ("j/k".into(), "rows".into()),
+                    ("⏎".into(), "jump to the block".into()),
+                    ("Esc".into(), "back".into()),
+                ],
+                View::Backup => vec![
+                    ("Ctrl-S".into(), "snapshot".into()),
+                    (":sql".into(), "console".into()),
+                    ("Esc".into(), "back".into()),
+                ],
+                View::Help => vec![("Esc".into(), "back".into()), ("q".into(), "quit".into())],
+                View::Sql => vec![
+                    ("⏎".into(), "run".into()),
+                    (".tables".into(), "list tables".into()),
+                    ("↑↓".into(), "history".into()),
+                    ("Esc".into(), "leave".into()),
+                ],
+            },
+        },
     };
     let mut spans: Vec<Span> = Vec::new();
     for (k, d) in pairs {
         spans.push(Span::styled(format!(" {} ", k), Theme::key()));
         spans.push(Span::styled(format!("{}  ", d), Theme::dim().bg(theme::BG)));
     }
-    f.render_widget(Paragraph::new(Line::from(spans)).style(Theme::hintbar()), area);
+    f.render_widget(
+        Paragraph::new(Line::from(spans)).style(Theme::hintbar()),
+        area,
+    );
 }
 
-fn render_toast(f: &mut Frame, app: &App, bounds: Rect) {
+/// The last action, on one line, above the hint bar. It replaces the floating
+/// bottom-right box whose "sqlite" title made it look like a database dialog.
+/// Any keypress clears it (`handle_key`), so it is a message, not a window.
+fn render_message(f: &mut Frame, app: &App, area: Rect) {
     let Some(t) = app.toast.as_ref() else { return };
-    let color = match t.kind {
-        ToastKind::Info => theme::ACCENT,
-        ToastKind::Good => theme::GREEN,
-        ToastKind::Warn => theme::ORANGE,
+    let (color, mark) = match t.kind {
+        ToastKind::Info => (theme::ACCENT, "·"),
+        ToastKind::Good => (theme::GREEN, "✓"),
+        ToastKind::Warn => (theme::ORANGE, "!"),
     };
-    let width = 52u16.min(bounds.width.saturating_sub(4));
-    let height = if t.sub.is_some() { 4 } else { 3 };
-    let rect = Rect {
-        x: bounds.x + bounds.width.saturating_sub(width + 2),
-        y: bounds.y + bounds.height.saturating_sub(height + 1),
-        width,
-        height,
-    };
-    f.render_widget(Clear, rect);
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(color).bg(theme::PANEL_ALT))
-        .style(Theme::overlay())
-        .title(Line::from(Span::styled(
-            " sqlite ",
+    f.render_widget(Clear, area);
+    let mut spans = vec![
+        Span::styled(
+            format!(" {} ", mark),
             Style::default().fg(theme::BG).bg(color).bold(),
-        )));
-    let inner = block.inner(rect);
-    f.render_widget(block, rect);
-    let mut lines = vec![Line::from(Span::styled(
-        t.text.clone(),
-        Style::default().fg(theme::FG).bg(theme::PANEL_ALT).bold(),
-    ))];
+        ),
+        Span::styled(
+            format!(" {} ", t.text),
+            Style::default().fg(theme::FG).bg(theme::PANEL_ALT).bold(),
+        ),
+    ];
     if let Some(sub) = &t.sub {
-        lines.push(Line::from(Span::styled(
-            truncate(sub, inner.width as usize),
-            Style::default().fg(theme::FAINT).bg(theme::PANEL_ALT),
-        )));
+        let room = (area.width as usize).saturating_sub(t.text.chars().count() + 6);
+        if room > 8 {
+            spans.push(Span::styled(
+                format!("  {} ", truncate(sub, room)),
+                Style::default().fg(theme::FAINT).bg(theme::PANEL_ALT),
+            ));
+        }
     }
-    f.render_widget(Paragraph::new(lines).style(Theme::overlay()), inner);
+    f.render_widget(
+        Paragraph::new(Line::from(spans)).style(Theme::overlay()),
+        area,
+    );
 }
 
 // ------------------------------------------------------------------ helpers

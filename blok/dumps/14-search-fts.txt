@@ -39,4 +39,4 @@
 │                                                                               ││                                                         │
 ╰───────────────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────╯
  NORMAL  blocks  ·  "snapshot"  2 hits  ·  block #21                                                                  no snapshot yet — :w
- / type   ↑↓ results   ⏎ open   Esc back
+ type search every block   ↑↓ results   ⏎ open   Esc back

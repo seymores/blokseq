@@ -5,16 +5,16 @@
 │                          ││▌▾ Deep work 09▏:00–12:30 on the block store                                ││                                │
 │JOURNALS                  ││ │ • Replaced the integer  position  with a fractional index                ││Yesterday (1)                   │
 │  Yesterday     Wed 07 · 2││ │ • Reordering 4k siblings was O(n) writes → now it is one row             ││· Touches ((blk-00000016)) — …  │
-│  2d ago        Tue 06 · 1││ ▾ Standup — [[Project Aurora]]                                             ││                                │
+│  2d ago        Tue 06 · 1││ ▾ Standup — [[Project Aurora]] ↗1                                          ││                                │
 │  3d ago        Mon 05 · 2││ │ • Export format settled: the SQLite file *is* the format                 ││────────────────────────────────│
 │                          ││ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                    ││UNLINKED (mentions of this title│
 │PAGES                     ││ │ │ • deadline:: 2026-02-20                                                ││· none                          │
 │  Project Aurora  2↗ · 11b││       priority:: A                                                         ││                                │
-│  blok TUI         2↗ · 5b││ │ • DOING Write up the sync story for [[blok TUI]]                         ││                                │
-│  sync             2↗ · 0b││ ▾ Idea: journals are rows, not files #blok                                 ││                                │
+│  blok TUI         2↗ · 5b││ │ • DOING Write up the sync story for [[blok TUI]] ↗1                      ││                                │
+│  sync             2↗ · 0b││ ▾ Idea: journals are rows, not files #blok ↗1                              ││                                │
 │  SQLite           1↗ · 1b││ │ • An empty day should not exist anywhere — not on disk, not in the DB    ││                                │
 │  Terminal UX      1↗ · 1b││ • Reading:  VACUUM INTO  semantics                                         ││                                │
-│  blok             1↗ · 0b││ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync                         ││                                │
+│  blok             1↗ · 0b││ • Storage trail: [[blok TUI]] · [[SQLite]] · #sync ↗3                      ││                                │
 │  Reading list          1b││                                                                            ││                                │
 │  Weekly review         1b││  • type here for the next block — or press o                               ││                                │
 │                          ││                                                                            ││                                │
@@ -39,4 +39,4 @@
 │graph  4 journals · 12 pag││                                                                            ││                                │
 ╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
  INSERT  ● editing  blocks  ·  2026-10-08  12 blocks  ·  block #21                                                    no snapshot yet — :w
- Esc → text normal   ⏎ split block   Alt-⏎ newline in block   / commands   [[ link page   (( block ref   # tag   Ctrl-w del word   ↑↓ popup
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag

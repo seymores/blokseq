@@ -39,4 +39,4 @@
 │graph  3 journals · 11 pag││                                                                            ││                                │
 ╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
  INSERT  ● editing  blocks  ·  2026-10-08  0 blocks                                                                   no snapshot yet — :w
- Esc → text normal   ⏎ split block   Alt-⏎ newline in block   / commands   [[ link page   (( block ref   # tag   Ctrl-w del word   ↑↓ popup
+ Esc stop editing   ⏎ new block   Alt-⏎ newline in this block   / commands   [[ link page   (( block ref   # tag

@@ -71,14 +71,24 @@ tools/         render_png.py — ANSI frame -> PNG screenshot
 
 ## Editing model
 
-Vim's, with the **block** as the line: `NORMAL` (the block list) → `TEXT` (inside
-one block's text) → `INSERT`, with `Esc` walking back up the ladder. `Ctrl-]`
-follows a link, `Ctrl-o`/`Ctrl-i` are the jumplist, `dd`/`yy`/`p` operate on whole
-subtrees, `u`/`Ctrl-r` undo and redo, and everything app-level is a `:` command
-(`:e`, `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations
-from vim are listed in [DESIGN.md §7.5](DESIGN.md).
+Vim's, with the **block** as the line, in three modes and no more: `NORMAL`,
+`INSERT`, `VISUAL`. **One `Esc` always stops editing** — the caret can sit inside
+a block's text (press `Enter`) and still be in NORMAL, and any tree motion leaves
+it, so the text cursor is a position rather than a fourth mode you can get stuck
+in. `Ctrl-]` or `gf` follows a link (`↗N` marks the blocks that have them),
+`Ctrl-o`/`Ctrl-i` are the jumplist, `dd`/`yy`/`p` operate on whole subtrees,
+`u`/`Ctrl-r` undo and redo, and everything app-level is a `:` command (`:e`,
+`:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
+are listed in [DESIGN.md §7.5](DESIGN.md).
+
+**Getting around** does not depend on knowing where the panes are: `Ctrl-P` opens
+any page or journal (filter as you type), `Ctrl-w h`/`Ctrl-w l` focus the pages
+panel and the references, `[`/`]` step through journal days, and `/` searches
+every block. The hint bar is computed from what is possible right now, so it
+doubles as the manual.
 
 Panels are toggles: `Ctrl-n` hides the sidebar, `Ctrl-b` hides the linked
 references, both persisted. Storage internals are not in the status bar at all —
 they live behind `:sql`, a read-only SQL console (`SELECT`, `PRAGMA`, `EXPLAIN`,
-`WITH`, plus `.tables` and `.schema`).
+`WITH`, plus `.tables` and `.schema`). The last action prints on one line above
+the status bar and clears on the next keypress.

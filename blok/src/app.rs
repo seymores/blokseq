@@ -161,6 +161,11 @@ pub struct App {
     pub ex: Option<ExState>,
     /// The troubleshooting console, when the Sql view has one.
     pub sql: Option<SqlConsole>,
+    /// True when the Normal-mode cursor sits *inside* the selected block's text
+    /// (reached with Enter, or left behind by `Esc` from Insert). A cursor
+    /// position, not a mode: any tree motion leaves it, so nobody gets stuck one
+    /// `Esc` away from the block list.
+    pub text_focus: bool,
     /// Accumulates a partial vim command (`g`, `d`, `z`, `>`, `<`, `c`).
     pub pending: String,
     /// In-app register for `yy` / `dd` + `p` / `P`.
@@ -170,8 +175,7 @@ pub struct App {
     pub link_menu: Vec<LinkTarget>,
     /// `:q!` skips the prune pass on the way out.
     pub prune_on_quit: bool,
-    pub visual: Option<usize>,
-    /// Jump list: `Ctrl-]` pushes, `Ctrl-o` / `Ctrl-i` walk it.
+    pub visual: Option<usize>,    /// Jump list: `Ctrl-]` pushes, `Ctrl-o` / `Ctrl-i` walk it.
     pub history: Vec<(View, Option<i64>)>,
     pub history_pos: usize,
     pub undo: Vec<UndoOp>,
@@ -234,6 +238,7 @@ impl App {
             palette: None,
             ex: None,
             sql: None,
+            text_focus: false,
             pending: String::new(),
             register: Vec::new(),
             register_label: String::new(),
@@ -672,13 +677,13 @@ impl App {
                     content: text.clone(),
                 });
                 self.redo.clear();
-                self.mode = Mode::Text;
+                self.text_focus = true;
+                self.mode = Mode::Normal;
                 self.popup = None;
                 self.reload();
                 self.select_block(nb.id);
                 self.begin_edit_block(nb.id);
                 if let Some(ed) = self.editor.as_mut() {
-                    ed.mode = Mode::Text;
                     ed.cursor = ed.chars.len();
                 }
             }
@@ -1062,22 +1067,35 @@ impl App {
 
     // -------------------------------------------------------------- palette
 
+    /// `Ctrl-P`: the open-page picker. Pages and journals, most useful first --
+    /// this is the answer to "how do I get to another page", which no longer
+    /// depends on finding the right pane first. Commands live in `:`.
     pub fn open_palette(&mut self) {
-        let all = vec![
-            ("Go to today's journal".into(), "G then J".into(), "today".into()),
-            ("Jump to date…".into(), "G then D".into(), "date".into()),
-            ("Search all blocks".into(), "/ or Ctrl-K".into(), "search".into()),
-            ("TODO board (query view)".into(), "view: status columns".into(), "query".into()),
-            ("New page…".into(), "Ctrl-N".into(), "newpage".into()),
-            ("Backup now (VACUUM INTO + remote)".into(), "writes one sqlite file".into(), "backup".into()),
-            ("Restore from snapshot…".into(), "opens the backup screen".into(), "backup".into()),
-            ("Prune empty journals".into(), "reclaims page rows".into(), "prune".into()),
-            ("Toggle folding of all blocks".into(), "z".into(), "collapse".into()),
-            ("Cycle TODO state".into(), "Ctrl-Enter".into(), "status".into()),
-            ("Open SQLite console".into(), "read-only".into(), "sqlite".into()),
-            ("Keyboard shortcuts".into(), "?".into(), "help".into()),
-            ("Change remote target (dropbox:Apps/blok)".into(), "settings".into(), "remote".into()),
-        ];
+        let mut all: Vec<(String, String, String)> = Vec::new();
+        let today = JournalDay::new(self.today);
+        all.push((
+            format!("{}  (today)", today.key()),
+            "journal".into(),
+            format!("journal:{}", today.key()),
+        ));
+        for (day, blocks, _preview) in self.db.journals(30) {
+            if day.date == self.today {
+                continue;
+            }
+            all.push((
+                day.key(),
+                format!("journal · {} · {} blocks", day.relative(self.today), blocks),
+                format!("journal:{}", day.key()),
+            ));
+        }
+        for (name, links, blocks) in self.db.pages(200) {
+            let action = format!("page:{}", name);
+            all.push((
+                name,
+                format!("page · {} blocks · {} links", blocks, links),
+                action,
+            ));
+        }
         let mut p = Palette {
             query: String::new(),
             all,
@@ -1118,35 +1136,25 @@ impl App {
             return;
         };
         let action = p.all[*idx].2.clone();
+        let label = p.all[*idx].0.clone();
         self.palette = None;
-        match action.as_str() {
-            "today" => self.goto_today(),
-            "search" => self.set_view(View::Search),
-            "query" => self.set_view(View::Query),
-            "backup" => self.set_view(View::Backup),
-            "help" => self.set_view(View::Help),
-            "prune" => self.prune_journals(),
-            "collapse" => self.collapse_all(),
-            "status" => self.cycle_status(),
-            "newpage" => {
-                let name = format!("Untitled {}", self.db.stats.pages + 1);
-                self.db.ensure_page(&name, PageKind::Page);
-                self.goto_page(&name);
-                self.toast(ToastKind::Good, &format!("page “{}” created", name), None);
+        if let Some(key) = action.strip_prefix("journal:") {
+            match crate::model::parse_journal_key(key) {
+                Some(day) => {
+                    self.push_history();
+                    self.goto_journal(day);
+                }
+                None => self.toast(ToastKind::Warn, "not a journal day", None),
             }
-            "date" => self.shift_journal(-1),
-            "remote" => self.toast(
-                ToastKind::Info,
-                "remote target: dropbox:Apps/blok",
-                Some("settings.remote_target"),
-            ),
-            "sqlite" => self.toast(
-                ToastKind::Info,
-                "sqlite3 ~/.blok/blok.db  (read-only URI recommended)",
-                Some("the database is the document"),
-            ),
-            _ => {}
+            return;
         }
+        if let Some(name) = action.strip_prefix("page:") {
+            self.push_history();
+            self.goto_page(name);
+            let _ = label;
+            return;
+        }
+        self.toast(ToastKind::Warn, &format!("nothing to open for {}", label), None);
     }
 
     // --------------------------------------------------------------- search
@@ -1215,6 +1223,10 @@ impl App {
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         let alt = k.modifiers.contains(KeyModifiers::ALT);
 
+        // A message is a message, not a window: any keypress clears it, and an
+        // action that produces a new one sets it again below.
+        self.toast = None;
+
         if self.palette.is_some() {
             match k.code {
                 KeyCode::Esc => self.palette = None,
@@ -1256,7 +1268,6 @@ impl App {
             return;
         }
         match self.mode {
-            Mode::Text => self.text_key(k, ctrl),
             Mode::Visual => self.visual_key(k, ctrl),
             _ => self.tree_key(k, ctrl),
         }
@@ -1265,16 +1276,14 @@ impl App {
     fn insert_key(&mut self, k: KeyEvent, ctrl: bool, alt: bool) {
         match k.code {
             KeyCode::Esc => {
-                // Vim: leaving insert lands you in Normal mode on the same
-                // line -- here, Normal mode *inside* the block.
+                // One Escape always leaves editing, as in vim. The caret stays
+                // in the block (text_focus); the next tree motion walks away.
                 let id = self.editor.as_ref().map(|e| e.block_id);
                 self.commit_edit();
                 if let Some(id) = id {
                     self.begin_edit_block(id);
-                    if let Some(ed) = self.editor.as_mut() {
-                        ed.mode = Mode::Text;
-                    }
-                    self.mode = Mode::Text;
+                    self.text_focus = true;
+                    self.mode = Mode::Normal;
                 }
             }
             KeyCode::Char('w') if ctrl => {

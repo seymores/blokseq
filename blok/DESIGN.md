@@ -62,11 +62,13 @@ rather than hiding it.
 | 2 | **Empty journals are pruned, and journals are lazily materialised** | A day you merely *looked at* never becomes a row in the database. See §4. |
 | 3 | **SQLite is the document — no markdown anywhere** | Blocks are rows, links are rows, search is an FTS5 index. Transactions, crash safety and referential integrity come free. |
 | 4 | **Backup = one `VACUUM INTO` snapshot, copied to a remote** | Never sync a live database file (WAL sidecars, hot journals, filesystem locking — see §5). Snapshot, then copy the snapshot. |
-| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. blok goes further and follows vim's grammar, with the **block** as the line, plus a second Normal mode inside a block's text (§7.5). |
+| 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.5). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
-| 8 | **Panels are toggles, not furniture** | The sidebar and the references pane each hide on one key (`Ctrl-n`, `Ctrl-b`) or one `:set`, persist in `settings`, and hand their width back to the outline. |
+| 8 | **Panels are toggles, not furniture** | The sidebar and the references pane each hide on one key (`Ctrl-n`, `Ctrl-b`) or one `:set`, persist in `settings`, and hand their width back to the outline. Hiding them is the user's decision — never a side effect of the window being 79 columns wide. |
 | 9 | **The engine stays off the screen until it is needed** | No WAL sizes, no engine badges, no snapshot chips in the corners. Schema and journal inspection live behind `:sql`, a read-only console (§6.6). |
+| 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. |
+| 11 | **Messages are messages, not windows** | The last action prints on one line above the status bar and any keypress clears it. No floating boxes: a dialog in the corner of an outliner is a riddle, not a feature. |
 
 ---
 
@@ -339,22 +341,25 @@ separate "small screen" mode.
 
 Four screens that came out of *using* the thing rather than drawing it.
 
-**Following links** (`Ctrl-]`). A block's links were visible but not traversable
-— the single worst omission in the first version. `Ctrl-]` follows the link under
-the cursor: one link and it goes straight there, several and it asks which.
-`Ctrl-o` / `Ctrl-i` walk the jumplist back and forward, which is vim's tag-stack
-behaviour.
+**Following links** (`Ctrl-]` or `gf`). A block's links were visible but not
+traversable — the single worst omission in the first version, and it took two
+passes to actually fix. Following one is now discoverable three ways over: the
+block is marked `↗N` in the outline, the hint bar for that block leads with
+"Ctrl-] follow N links", and `Ctrl-]`/`gf` opens the chooser when a block holds
+several. `Ctrl-o` / `Ctrl-i` walk the jumplist, which is vim's tag-stack
+behaviour. A page that does not exist yet reads `new page` rather than failing.
 
 ![Link chooser](dumps/png/21-follow-link-menu.png)
 
 *Each candidate is resolved and labelled: a page that exists, a tag, or a block
-ref shown with its target's text. A link to a page that does not exist yet reads
-`new page` instead of failing.*
+ref shown with its target's text.*
 
-**TEXT mode.** Vim inside a block: word and line motions, `x`/`dw`/`cw`/`D`/`C`,
-and `j`/`k` that walk the block's lines and hop to the neighbour at the boundary.
+**The caret inside a block.** `Enter` puts the caret in the text without changing
+mode; word and line motions work there, and any tree motion leaves it. One
+`Esc` from typing always returns to NORMAL (see §7.5 — this part was two modes
+and a three-step ladder in the previous revision, which was a design error).
 
-![Text mode](dumps/png/22-text-normal-vim.png)
+![Caret in a block](dumps/png/22-text-normal-vim.png)
 
 **The `:` command line**, with completion, so app-level actions stop claiming
 letters that vim owns and the whole surface stays discoverable.
@@ -372,9 +377,24 @@ missing, a snapshot did not upload, or the schema is not what you think.
 
 **Hidden panels.** `Ctrl-n` and `Ctrl-b`, or `:set nosidebar` / `:set norefs`,
 both persisted in `settings`. The status bar says what is hidden, so a missing
-pane is never a mystery, and the outline takes the width back.
+pane is never a mystery, and the outline takes the width back. (The subtler bug
+here: at 79 columns the sidebar was dropped *even when it was "shown"*, so
+`Ctrl-w h` focused a pane that was not on screen.)
 
 ![Both panels hidden](dumps/png/26-panels-hidden.png)
+
+**Getting to another page** does not require the sidebar at all. `Ctrl-P` is a
+page/journal picker — filter as you type, `⏎` opens — and `Ctrl-w h` focuses the
+panel when that is what you want.
+
+![Page picker](dumps/png/13-command-palette.png)
+
+**Messages, not dialogs.** The previous revision drew the last action in a
+floating box in the bottom-right corner, titled `sqlite`, which read as a
+database dialog. It is now one line above the status bar, cleared by the next
+keypress, with no title at all.
+
+![Message line](dumps/png/08b-indent-after.png)
 
 ---
 
@@ -470,38 +490,46 @@ converge) while **zoom belongs to the client** (so it never syncs). blok keeps
 
 ### 7.5 Vim conformance, and the one place an outliner bends it
 
-The brief for this section was "editing should follow VIM convention
-completely", and the honest answer is that it can be followed almost completely:
-the only real conflict is that vim's model is *lines in a file*, and here the
-unit is a **block** which may itself contain lines (Alt-⏎). So the model has two
-Normal modes rather than one, and the ladder is:
+The brief was "editing should follow VIM convention completely". The only real
+conflict is that vim's model is *lines in a file*, and here the unit is a
+**block** which may itself contain lines (Alt-⏎). An earlier revision resolved
+that with a second Normal mode (`TEXT`) and a three-step ladder. **That was a
+mistake and it has been removed**: two Escapes to get out of editing reads as a
+stuck app, and a mode chip that says `TEXT` explains nothing.
+
+There are **three modes**, and the caret is a *position*, not a mode:
 
 ```
-NORMAL (blocks)  --Enter/i-->  TEXT (inside one block)  --i/a/A-->  INSERT
-       ^                              |                                |
-       +------------ Esc ------------+------------- Esc --------------+
+NORMAL  ── i a I A o O cc ──▶  INSERT
+   ▲                              │
+   └────────────  Esc ────────────┘      one Escape. Always.
 ```
 
-* `NORMAL` is the file-level view: the blocks are the lines, so `j`/`k`/`gg`/`G`
-  move between them and the operators (`dd`, `yy`, `p`, `>>`, `J`, `cc`) act on
-  whole subtrees.
-* `TEXT` is the line-level view: the cursor is on a character, so vim's text
-  grammar works — `w b e 0 ^ $`, `x`, `dw`, `d$`, `cw`, `C`, and `j`/`k` between
-  the block's own lines. `Esc` from Insert lands here, not somewhere else, which
-  is the behaviour vim users actually rely on.
-* `VERB is `v`/`V`: a range of blocks, or a whole subtree, with `>`, `<`, `d`,
+* `NORMAL` — the block list. `j`/`k`/`gg`/`G` move, operators (`dd`, `yy`, `p`,
+  `>>`, `J`, `cc`) act on subtrees. The caret can additionally sit *inside* the
+  selected block's text (press `Enter`, or arrive there by leaving INSERT). While
+  it does, vim's text grammar applies — `w b e 0 ^ $`, `x`, `dw`, `d$`, `cw`,
+  `C` — and **any tree motion leaves the text first**: `j` is enough. That is the
+  difference between a cursor sub-state and a mode: you cannot get stuck in it.
+* `INSERT` — typing. `Esc` returns to NORMAL with the caret still in the block.
+* `VISUAL` — `v` a range of blocks, `V` a whole subtree, with `>`, `<`, `d`,
   `y`, `J`, `K`.
 
-**Following links** is the other half of "vim-like": `Ctrl-]` behaves like vim's
-tag jump (`Ctrl-o` back, `Ctrl-i` forward), so a `[[page]]` or a `((block ref))`
-is a destination, not decoration. Where a block holds several links you get the
-chooser instead of a guess.
+The status bar shows a small `in block` chip while the caret is in text, and the
+hint bar changes to say so — `j/k back to the blocks` is the first thing it
+offers.
+
+**Following links.** `Ctrl-]` (and `gf`) behave like vim's tag jump, with
+`Ctrl-o`/`Ctrl-i` walking the jumplist. A block that contains links is marked
+`↗N` in the outline, and the hint bar for a block with links leads with
+"Ctrl-] follow N links" — so a link is a visible destination rather than a
+decoration you have to guess about.
 
 **The deviations, all five of them:**
 
 1. `hjkl` navigate the tree, because there is no document to navigate.
-2. `Enter` moves the cursor into the block's text (still `NORMAL`) instead of
-   down a line — down a line is `j`, since a line is a block.
+2. `Enter` puts the caret in the block's text instead of moving down a line —
+   down a line is `j`, since a line is a block.
 3. `J` joins a block with the *next block*, which is `J` with blocks as lines.
 4. `?` opens the keymap rather than searching backwards; `/` then `N` covers that.
 5. App-level commands live in `:` (`:e`, `:w`, `:set`, `:sql`, `:board`, `:m +1`)
@@ -515,16 +543,6 @@ vim's grammar is made visible rather than assumed.
 
 ## 8. Keymap
 
-blok's editing model is vim's, with the **block** as the line. There are two
-Normal modes because a block can itself hold several lines:
-
-* `NORMAL` — the block list. `j`/`k`/`gg`/`G` move, operators act on subtrees.
-* `TEXT` — Normal mode with the cursor inside one block's text. This is where
-  `Esc` from Insert leaves you, exactly as in vim; word and line motions apply
-  here, and `j`/`k` walk the block's lines, hopping to the neighbouring block at
-  the boundary.
-* `INSERT`, `VISUAL` — as you would expect.
-
 `?` opens the two-column reference; the single source of truth is `KEYMAP` in
 `src/app.rs`, rendered verbatim by the help screen. The table:
 
@@ -533,13 +551,14 @@ Normal modes because a block can itself hold several lines:
 | `i` `a` `I` `A` | insert · append · line start · line end |
 | `o` `O` | open a block below / above and insert |
 | `cc` | change the block (clear it, then insert) |
-| `Esc` | insert → text → blocks: vim's ladder, one step per press |
-| `Enter` | put the cursor *in* the block's text (Normal mode there) |
+| `Esc` | **one press always stops editing**; a second drops the caret |
+| `Enter` | put the caret *in* the block's text (still NORMAL) |
 | `j` `k` `h` `l` | next · previous · parent · first child block |
 | `gg` `G` `Ctrl-d` `Ctrl-u` | first · last · half page down · half page up |
 | `[` `]` | previous / next journal day |
-| `Ctrl-w h` `Ctrl-w l` `Ctrl-w w` | focus sidebar · references · cycle |
-| `Ctrl-]` | follow the link on this block (menu when there are several) |
+| `Ctrl-P` | **open any page**: page/journal picker, filter as you type |
+| `Ctrl-w h` `Ctrl-w l` `Ctrl-w w` | focus the pages panel · references · cycle |
+| `Ctrl-]` or `gf` | follow the link on this block (menu when there are several) |
 | `Ctrl-o` `Ctrl-i` | jump back / forward (vim's jumplist) |
 | `Enter` (references pane) | open the block that references this page |
 | `dd` `x` | delete the block, subtree included |
@@ -549,13 +568,12 @@ Normal modes because a block can itself hold several lines:
 | `J` | join: merge this block with the one below |
 | `u` `Ctrl-r` | undo / redo |
 | `za` `zc` `zo` `zR` `zM` | fold · close · open · all open · all closed |
-| `w` `b` `e` `0` `^` `$` | word and line motions inside one block (TEXT mode) |
-| `x` `dw` `d$` `D` `cw` `ciw` `C` | delete / change inside one block (TEXT mode) |
-| `Ctrl-w` `Ctrl-u` | delete word / to line start (INSERT mode) |
+| `w` `b` `e` `0` `^` `$` | word and line motions, with the caret in a block |
+| `x` `dw` `d$` `D` `cw` `ciw` `C` | delete / change, with the caret in a block |
+| `Ctrl-w` `Ctrl-u` | delete word / to line start (INSERT) |
 | `v` / `V` | select a block range / a whole subtree |
 | `>` `<` `d` `y` `J` `K` | indent, delete, yank, reorder the selection (VISUAL) |
 | `:` | ex command line, Tab-completed |
-| `Ctrl-P` | command palette |
 | `/` `n` `N` | search the graph · next · previous match |
 | `Ctrl-n` `Ctrl-b` | show / hide the sidebar · the linked references |
 | `Ctrl-S` | snapshot, then the storage screen |

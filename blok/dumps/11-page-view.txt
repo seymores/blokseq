@@ -12,9 +12,9 @@
 │  Project Aurora  2↗ · 11b││ │ │ • DONE Conflict model: last-writer-wins per *block*, not per file      ││                                │
 │  blok TUI         2↗ · 5b││ │ • LATER On-device full-text reindex after a restore                      ││                                │
 │  sync             2↗ · 0b││ • Storage argument lives in ((↗ Idea: journals are rows, no…)) (today's jo…││                                │
-│  SQLite           1↗ · 1b││ • Open question #sync: what happens when two devices both snapshot at 09:0…││                                │
-│  Terminal UX      1↗ · 1b││                                                                            ││                                │
-│  blok             1↗ · 0b││                                                                            ││                                │
+│  SQLite           1↗ · 1b││↗1                                                                          ││                                │
+│  Terminal UX      1↗ · 1b││ • Open question #sync: what happens when two devices both snapshot at 09:0…││                                │
+│  blok             1↗ · 0b││↗1                                                                          ││                                │
 │  Reading list          1b││                                                                            ││                                │
 │  Weekly review         1b││                                                                            ││                                │
 │                          ││                                                                            ││                                │
@@ -39,4 +39,4 @@
 │graph  4 journals · 12 pag││                                                                            ││                                │
 ╰──────────────────────────╯╰────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
  NORMAL  blocks  ·  Pages/Project Aurora  11 blocks  ·  block #3                                                      no snapshot yet — :w
- j/k blocks   h/l parent/child   ⏎ into text   i insert   o/O new block   dd/yy/p cut, copy, paste   >>/<< indent   za fold   Ctrl-] follow
+ j/k blocks   ⏎ / i edit this block   o new block   h/l parent / children   za fold   Ctrl-P open page   Ctrl-w h pages panel   / search   :

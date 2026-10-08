@@ -8,8 +8,6 @@ use crate::model::properties;
 pub enum Mode {
     /// Tree normal: vim's Normal mode with the *block* as the line.
     Normal,
-    /// Text normal: vim's Normal mode with the cursor inside one block's text.
-    Text,
     Insert,
     Visual,
 }
@@ -18,7 +16,6 @@ impl Mode {
     pub fn label(self) -> &'static str {
         match self {
             Mode::Normal => "NORMAL",
-            Mode::Text => "TEXT",
             Mode::Insert => "INSERT",
             Mode::Visual => "VISUAL",
         }
@@ -28,7 +25,6 @@ impl Mode {
     pub fn scope(self) -> &'static str {
         match self {
             Mode::Normal => "blocks",
-            Mode::Text => "block text",
             Mode::Insert => "typing",
             Mode::Visual => "range",
         }

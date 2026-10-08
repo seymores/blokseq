@@ -4,12 +4,12 @@
 │  engine             SQLite · WAL · FTS5                      ││  one file in, one file out — no document merge, no conflict soup         │
 │  file size          108.0 KB                                 ││                                                                          │
 │  wal size           0 B                                      ││  WHEN            SIZE      STATE     FILE                                │
-│  integrity          ok                                       ││  00:06:49      1.1 MB   uploaded blok-20261008-000649.sqlite             │
-│                                                              ││  03:06:49      1.1 MB   uploaded blok-20261008-030649.sqlite             │
-│  tables                                                      ││  06:06:49      1.1 MB   uploaded blok-20261008-060649.sqlite             │
-│  pages              12 rows                                  ││  09:06:49      1.1 MB   uploaded blok-20261008-090649.sqlite             │
-│  journals           4 rows                                   ││  12:06:49      1.1 MB   uploaded blok-20261008-120649.sqlite             │
-│  blocks             38 rows                                  ││  15:06:49      1.1 MB   queued   blok-20261008-150649.sqlite             │
+│  integrity          ok                                       ││  00:16:39      1.1 MB   uploaded blok-20261008-001639.sqlite             │
+│                                                              ││  03:16:39      1.1 MB   uploaded blok-20261008-031639.sqlite             │
+│  tables                                                      ││  06:16:39      1.1 MB   uploaded blok-20261008-061639.sqlite             │
+│  pages              12 rows                                  ││  09:16:39      1.1 MB   uploaded blok-20261008-091639.sqlite             │
+│  journals           4 rows                                   ││  12:16:39      1.1 MB   uploaded blok-20261008-121639.sqlite             │
+│  blocks             38 rows                                  ││  15:16:39      1.1 MB   queued   blok-20261008-151639.sqlite             │
 │  refs               11 rows                                  ││                                                                          │
 │  properties         2 rows                                   ││  WHY THIS IS SAFE                                                        │
 │                                                              ││  ▸ VACUUM INTO writes a consistent snapshot while the app keeps running. │
@@ -33,10 +33,10 @@
 │                                                              ││                                                                          │
 │                                                              ││                                                                          │
 │                                                              ││                                                                          │
-│                                                              ││                     ╭ sqlite ──────────────────────────────────────────╮ │
-│                                                              ││                     │pruned 6 empty journal pages                      │ │
-│                                                              ││                     │a journal only exists once it has content         │ │
-│                                                              ││                     ╰──────────────────────────────────────────────────╯ │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
+│                                                              ││                                                                          │
 ╰──────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────╯
+ !  pruned 6 empty journal pages   a journal only exists once it has content
  NORMAL  blocks  ·  ok · 108.0 KB  ·  block #21                                                                       no snapshot yet — :w
  Ctrl-S snapshot   :sql console   Esc back
