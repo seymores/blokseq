@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  3 links — pick one   ↑↓ choose · Enter follow · Esc cancel
  NORMAL   12/12
- Ctrl-M metadata   Ctrl-] follow 3 links   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down    ? all keys
+ m metadata   f follow 3 links   j/k blocks   ⏎ / i edit   w b e words   / find   o new block   [ ] back / forward   ? all keys

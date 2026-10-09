@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  block merged upward   Backspace at start of block
  NORMAL    4/12
- Ctrl-M metadata   Ctrl-] follow 1 link   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down     ? all keys
+ m metadata   f follow 1 link   j/k blocks   ⏎ / i edit   w b e words   / find   o new block   [ ] back / forward   ? all keys

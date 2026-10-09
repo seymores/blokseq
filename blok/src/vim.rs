@@ -431,6 +431,31 @@ impl App {
         };
     }
 
+    /// `Tab`: go to the metadata panel -- showing it first if it is hidden, and
+    /// coming back to the outline if it already has the focus. One key for "the
+    /// other pane", which is what Tab means in every TUI worth using. The
+    /// outline's indent is `>>`; Tab indents a *line* only with the caret in the
+    /// text, where indentation is what you are doing.
+    pub fn focus_panel(&mut self) {
+        if !self.show_meta {
+            self.toggle_meta();
+        }
+        if self.focus == Focus::Right {
+            self.focus = Focus::Main;
+        } else {
+            self.focus = Focus::Right;
+        }
+        self.toast(
+            ToastKind::Info,
+            if self.focus == Focus::Right {
+                "metadata panel"
+            } else {
+                "back to the blocks"
+            },
+            Some("Tab switches · m hides the panel"),
+        );
+    }
+
     pub fn focus_cycle(&mut self) {
         self.focus = match self.focus {
             Focus::Main if self.show_meta => Focus::Right,
@@ -1105,13 +1130,15 @@ impl App {
                 self.search_query.pop();
                 self.run_search();
             }
-            KeyCode::Char('n') if ctrl => {
+            KeyCode::Char('n') => {
+                // The ranked list's own keys, now that `/` is the Find prompt:
+                // `n`/`N` only mean anything while this screen is open.
                 if self.search_selected + 1 < self.search_results.len() {
                     self.search_selected += 1;
                 }
             }
-            KeyCode::Char('p') if ctrl => {
-                self.search_selected = self.search_selected.saturating_sub(1)
+            KeyCode::Char('N') => {
+                self.search_selected = self.search_selected.saturating_sub(1);
             }
             KeyCode::Char(c) if !ctrl => {
                 self.search_query.push(c);
@@ -1401,20 +1428,25 @@ impl App {
             // Ctrl-M only arrives as itself on terminals that disambiguate
             // it from Enter (see main.rs). `gm` is the spelling that always
             // works, which is why the hint bar may name it instead.
-            "C-m" | "gm" => self.toggle_meta(),
-            // Ctrl-P is the navigation: "Find" is everything the sidebar and
-            // the page tree used to be, minus the pane you had to find first.
-            "C-p" => self.open_palette(),
-            "C-r" => self.redo(),
-            "C-]" => self.follow_link(),
+            // One letter per action, where the action makes sense. The Ctrl
+            // spellings stay as aliases below; nothing in reading mode needs one.
+            "m" | "C-m" | "gm" => self.toggle_meta(),
+            "R" | "C-r" => self.redo(),
+            // `f` follows a link here; in the block's *text* `f` is vim's
+            // find-a-character. The caret's position decides, as everywhere.
+            "f" | "C-]" => self.follow_link(),
             "gf" => self.follow_link(),
             "C-o" | "C-t" => self.history_back(),
             "C-i" => self.history_forward(),
-            "C-s" => {
+            // `s` snapshots and shows the storage screen; Ctrl-S is the same
+            // thing from any mode, including the middle of a sentence.
+            "s" | "C-s" => {
                 self.do_backup();
                 self.set_view(View::Backup);
             }
-            "C-wl" | "C-ww" => self.focus_right(),
+            // `Tab` is the pane key: the outline's indent is `>>`, and Tab means
+            // "indent this line" only when the caret is in the text.
+            "<Tab>" | "C-wl" | "C-ww" => self.focus_panel(),
             "u" => self.undo(),
             "dd" | "x" => self.delete_selected(),
             "yy" | "Y" => self.yank_selected(),
@@ -1422,8 +1454,8 @@ impl App {
             "P" => self.paste(true),
             "J" => self.merge_with_next(),
             "cc" => self.change_block(),
-            ">>" | "<Tab>" => self.indent_selected(),
-            "<<" | "<S-Tab>" => self.outdent_selected(),
+            ">>" => self.indent_selected(),
+            "<<" => self.outdent_selected(),
             "za" => self.toggle_collapse(),
             "zc" => self.set_collapsed(true),
             "zo" => self.set_collapsed(false),
@@ -1438,9 +1470,10 @@ impl App {
             "v" => self.enter_visual(false),
             "V" => self.enter_visual(true),
             ":" => self.open_ex(),
-            "/" => self.open_search(),
-            "n" => self.search_step(1),
-            "N" => self.search_step(-1),
+            // One search, not two: `/` is the Find prompt, which lists what you
+            // touched last and then searches page names *and* block text. The
+            // full-screen ranked list is still there as `:search <query>`.
+            "/" | "C-p" => self.open_palette(),
             "?" => self.set_view(View::Help),
             // Back and forward through the pages you have opened -- the same
             // two motions as `Ctrl-o`/`Ctrl-i`, on the keys a browser taught
@@ -1706,20 +1739,27 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_w_l_reaches_the_metadata_panel_once_it_is_shown() {
+    fn tab_reaches_the_metadata_panel_and_comes_back() {
         let mut a = app("refs_focus");
         assert!(!a.show_meta, "hidden by default");
-        ctrl(&mut a, 'w');
-        key(&mut a, 'l');
-        assert_eq!(
-            a.focus,
-            Focus::Main,
-            "there is no panel to focus while it is hidden"
-        );
+        // `Tab` is the pane key: it shows the panel rather than doing nothing
+        // because the thing you are asking for is not on screen yet.
+        code(&mut a, KeyCode::Tab);
+        assert!(a.show_meta, "Tab shows the metadata panel");
+        assert_eq!(a.focus, Focus::Right, "and focuses it");
+        code(&mut a, KeyCode::Tab);
+        assert_eq!(a.focus, Focus::Main, "a second Tab comes back");
+        assert!(a.show_meta, "without hiding it");
+
+        // `m` shows and hides without moving the focus, and the old spellings
+        // still work for fingers that know them.
+        key(&mut a, 'm');
+        assert!(!a.show_meta);
         ctrl(&mut a, 'm');
+        assert!(a.show_meta, "Ctrl-M is still an alias");
         ctrl(&mut a, 'w');
         key(&mut a, 'l');
-        assert_eq!(a.focus, Focus::Right, "Ctrl-w l focuses the metadata panel");
+        assert_eq!(a.focus, Focus::Right, "so is Ctrl-w l");
         code(&mut a, KeyCode::Esc);
         assert_eq!(a.focus, Focus::Main, "Esc goes back to the blocks");
     }
@@ -1775,7 +1815,7 @@ mod tests {
         key(&mut a, 'g');
         key(&mut a, 'm');
         assert!(a.show_meta, "gm shows the page metadata");
-        assert_eq!(a.meta_key(), "gm", "without terminal support, gm is named");
+        assert!(a.show_meta, "the panel is up");
     }
 
     #[test]
@@ -2060,33 +2100,106 @@ mod tests {
     /// The other half of the report: from the tree, Tab is still a structural
     /// indent, and `>>` still does it with the caret in the text.
     #[test]
-    fn tab_from_the_tree_still_indents_the_block() {
+    fn tab_in_the_tree_is_the_pane_key_and_indent_is_the_arrows() {
         let mut a = app("tab_structure");
         assert!(!a.text_focus);
         // The first block has no previous sibling to adopt, so indenting it is
         // correctly a no-op: use the second.
         key(&mut a, 'j');
         let id = a.rows[1].id;
+        let depth = a.rows[1].depth;
+
+        // Tab is the pane key from the tree: one meaning per key per domain, and
+        // the outline's indent is `>>`, which says what it does.
         code(&mut a, KeyCode::Tab);
+        assert_eq!(a.focus, Focus::Right, "Tab focused the metadata panel");
+        assert_eq!(
+            a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
+            Some(depth),
+            "and it did not re-indent the block"
+        );
+        code(&mut a, KeyCode::Tab);
+        key(&mut a, '>');
+        key(&mut a, '>');
         assert_eq!(
             a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
             Some(1),
-            "Tab from the tree indents the block"
-        );
-        assert!(a.editor.is_none(), "and it did not open an editor");
-
-        // `>>` with the caret in the text says what it does: structure, not text.
-        code(&mut a, KeyCode::Enter);
-        assert!(a.text_focus);
-        let depth = a.rows.iter().find(|r| r.id == id).map(|r| r.depth);
-        key(&mut a, '>');
-        key(&mut a, '>');
-        assert_eq!(
-            a.rows.iter().find(|r| r.id == id).map(|r| r.depth),
-            depth,
-            "there is no previous sibling at this level, so nothing moves"
+            ">> indents the block"
         );
         assert!(a.db.block(id).and_then(|b| b.parent_id).is_some());
+
+        // With the caret in the text, Tab is indentation again.
+        code(&mut a, KeyCode::Enter);
+        assert!(a.text_focus);
+        code(&mut a, KeyCode::Tab);
+        assert!(
+            a.editor.as_ref().unwrap().text().starts_with("  "),
+            "Tab in the text indents the line"
+        );
+    }
+
+    /// The point of the remap: in reading mode, no Ctrl is needed. Every action
+    /// here is a single letter, and the Ctrl spellings are aliases.
+    #[test]
+    fn reading_mode_needs_no_ctrl() {
+        // `/` is Find: pages, journals and block text in one prompt.
+        let mut a = app("no_ctrl_find");
+        key(&mut a, '/');
+        assert!(a.palette.is_some(), "/ opens Find");
+        code(&mut a, KeyCode::Esc);
+
+        // `m` is the metadata panel.
+        key(&mut a, 'm');
+        assert!(a.show_meta, "m shows the metadata panel");
+        key(&mut a, 'm');
+        assert!(!a.show_meta, "and m hides it again");
+
+        // `f` follows the link on this block. The destination has to be a page
+        // we are *not* already on, or this assertion passes without `f` doing
+        // anything -- which is exactly what the first version of it did.
+        let mut a = app("no_ctrl_follow");
+        let page = a.db.ensure_page("Test Page", PageKind::Page);
+        let other = a.db.ensure_page("Elsewhere", PageKind::Page);
+        a.db.create_block(other.id, None, None, "somewhere else");
+        let b = a
+            .db
+            .create_block(page.id, None, None, "jump to [[Elsewhere]]")
+            .id;
+        a.reload();
+        a.select_block(b);
+        key(&mut a, 'f');
+        assert_eq!(
+            a.view,
+            View::Page("Elsewhere".into()),
+            "f follows the link"
+        );
+
+        // `s` snapshots, and `R` redoes what `u` undid.
+        let mut a = app("no_ctrl_snapshot");
+        key(&mut a, 's');
+        assert_eq!(a.view, View::Backup, "s snapshots and shows the storage");
+        assert_eq!(a.db.snapshots(5).len(), 1, "and a snapshot exists");
+
+        let mut a = app("no_ctrl_redo");
+        key(&mut a, 'd');
+        key(&mut a, 'd');
+        let after_delete = a.rows.len();
+        key(&mut a, 'u');
+        assert_eq!(a.rows.len(), after_delete + 1, "u undoes");
+        key(&mut a, 'R');
+        assert_eq!(a.rows.len(), after_delete, "R redoes");
+
+        // And the aliases agree with them, so a vim habit is not punished.
+        let mut b = app("no_ctrl_alias");
+        ctrl(&mut b, 'p');
+        assert!(b.palette.is_some(), "Ctrl-P is still Find");
+        b.palette = None;
+        ctrl(&mut b, 'm');
+        assert!(b.show_meta, "Ctrl-M is still the panel");
+        ctrl(&mut b, 's');
+        assert_eq!(b.view, View::Backup, "Ctrl-S is still the snapshot");
+        ctrl(&mut b, 'r');
+        assert!(b.toast.is_some() || b.rows.len() == 2);
     }
 
     /// Report: "How to edit or input multiline codeblock?" The answer used to be
@@ -2642,5 +2755,26 @@ mod tests {
             last,
             "and pressing w again does not wrap around"
         );
+    }
+
+    /// `/` is Find now, so the ranked full-screen list is reached with
+    /// `:search <query>`. It keeps its own `n`/`N` -- they only ever meant
+    /// something while that screen was open, which is why they left the outline's
+    /// keyspace.
+    #[test]
+    fn the_ranked_search_screen_is_reached_with_the_command() {
+        let mut a = app("search_ex");
+        a.run_ex("search block");
+        assert_eq!(a.view, View::Search, ":search opens the ranked list");
+        assert!(a.search_results.len() >= 2, "with hits in it");
+
+        // Printable keys are query text on this screen, so the way down the list
+        // is `n` (or the arrows), which is why `n`/`N` live here rather than in
+        // the outline's keyspace.
+        let first = a.search_selected;
+        key(&mut a, 'n');
+        assert!(a.search_selected > first, "n moves down the list");
+        code(&mut a, KeyCode::Enter);
+        assert_ne!(a.view, View::Search, "and Enter opens the block");
     }
 }

@@ -59,7 +59,6 @@ fn build_app(name: &str) -> App {
     app.clock = "09:41".into();
     // The frames show the key a modern terminal gives you (`Ctrl-M`); the
     // fallback label is exercised by the tests, not by a screenshot.
-    app.ctrl_m_works = true;
     seed(&mut app);
     app.reload();
     app

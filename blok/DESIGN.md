@@ -65,9 +65,9 @@ rather than hiding it.
 | 5 | **Modal editing, vim's model** | A folding outliner *must* have a Normal mode: `j`/`k`, `Tab`, `z` cannot insert characters. Three modes, and **one `Esc` always leaves editing**; the text cursor is a position, not a fourth mode (§7.7). |
 | 6 | **Soft wrap, and the cursor is a first-class citizen** | Hard wrap rewrites the document; a block is one logical line. The caret is computed against the wrapped layout, not the source string. |
 | 7 | **No Nerd Font, no glyph roulette** | Every glyph in the UI is verified to have ink in a stock macOS/Linux monospace face. Decorative icons that render as blank tofu were removed during the build. |
-| 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `Ctrl-P` (Find) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `Ctrl-M` (or `:set meta`) and persists; the outline is the whole window until then. |
+| 8 | **No page tree, and the metadata panel is off by default** | The sidebar was deleted outright: `/` (find and search) is the navigation, so there is nothing to focus first. The page-metadata panel is asked for with `m` (or `:set meta`) and persists; the outline is the whole window until then. |
 | 9 | **The engine stays off the screen until it is needed** | No WAL sizes, no engine badges, no snapshot chips in the corners. Schema and journal inspection live behind `:sql`, a read-only console (§6.6). |
-| 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `Ctrl-P`, one key away. It measures itself too: when the row is too narrow the tail is dropped, except the last pair, which is pinned to the right edge because the last pair is always `?` — hiding the way to the manual is the one thing a truncated hint bar must not do. |
+| 10 | **The hint bar is the manual** | It is computed from state — mode, caret, pane focus, and whether the selected block has links to follow — so "what can I do here" is always on screen, and "how do I reach another page" is `/`, one key away. It measures itself too: when the row is too narrow the tail is dropped, except the last pair, which is pinned to the right edge because the last pair is always `?` — hiding the way to the manual is the one thing a truncated hint bar must not do. |
 | 11 | **Messages are messages, not windows** | The last action prints on one line above the status bar and any keypress clears it. No floating boxes: a dialog in the corner of an outliner is a riddle, not a feature. |
 
 ---
@@ -286,7 +286,7 @@ and one status line.
   in purple *resolved to a snippet of the target*, `#tags` in green, `key:: value`
   cyan keys, `TODO`/`DOING`/`DONE` badges, `` `code` `` on a raised background,
   `**bold**`, and `↗N` on any block that contains links.
-* **Right (`Ctrl-M`, hidden by default) — PAGE METADATA:** what the page *is*
+* **Right (`m`, hidden by default) — PAGE METADATA:** what the page *is*
   (kind, created/updated, block count, links in/out, and any `key:: value`
   properties on a top-level block), then the linked references grouped by source
   page, then unlinked mentions of the title that are not yet linked. Asking for
@@ -296,14 +296,14 @@ and one status line.
 
 ### 6.2 Page view and links
 
-| Page | Page metadata (`Ctrl-M`) |
+| Page | Page metadata (`m`) |
 |---|---|
 | ![Page](dumps/png/11-page-view.png) | ![Metadata](dumps/png/12-linked-references.png) |
 
 The same outliner, titled with the page name. The metadata panel shows the page's
 facts above its backlinks — here `kind page`, `12 blocks`, `2 in · 2 out`, and the
 `owner::`/`review::`/`status::` properties it inherits from a top-level block.
-`Ctrl-w l` focuses it once it is visible; the focused pane's border and section
+`Tab` focuses it, showing it first if it is hidden; the focused pane's border and section
 title change colour, and the selected reference gets a `▸` marker (selection is
 never carried by colour alone — it has to survive a monochrome terminal).
 
@@ -316,7 +316,7 @@ never carried by colour alone — it has to survive a monochrome terminal).
 All three popups are anchored to the caret, open on the trigger character, fuzzy-
 filter as you type, and accept with Tab/Enter.
 
-There is a fourth list, and it is not one of these three: `Ctrl-]` on a block with
+There is a fourth list, and it is not one of these three: `f` on a block with
 several links opens the destinations already *in* that block. It is a menu rather
 than a text field — typing filters it and never touches the block — and Enter
 follows the selected link, which is navigation, so `[` (or `Ctrl-o`) comes back to
@@ -357,11 +357,11 @@ the whole window at every width, which is the point of deleting the chrome.
 
 Four screens that came out of *using* the thing rather than drawing it.
 
-**Following links** (`Ctrl-]` or `gf`). A block's links were visible but not
+**Following links** (`f`, or `Ctrl-]`/`gf`). A block's links were visible but not
 traversable — the single worst omission in the first version, and it took two
 passes to actually fix. Following one is now discoverable three ways over: the
 block is marked `↗N` in the outline, the hint bar for that block leads with
-"Ctrl-] follow N links", and `Ctrl-]`/`gf` opens the chooser when a block holds
+"f follow N links", and `f` opens the chooser when a block holds
 several. `[` / `]` (and `Ctrl-o` / `Ctrl-i`, which are the same two motions)
 walk that history back and forward. A page that does not exist yet reads
 `new page` rather than failing.
@@ -405,25 +405,20 @@ missing, a snapshot did not upload, or the schema is not what you think.
 ![SQL console: .tables](dumps/png/25-sql-tables.png)
 
 **A terminal caveat, handled rather than hidden.** `Ctrl-M` is the same byte as
-`Enter` (`0x0D`) under the legacy terminal encoding, which is why the first
-attempt at this binding simply started editing the block. blok now asks the
-terminal to disambiguate those keys at startup (the kitty keyboard protocol's
-`DISAMBIGUATE_ESCAPE_CODES`, via crossterm); where the terminal agrees — kitty,
-WezTerm, foot, Ghostty, tmux 3.3+ with `extended-keys on` — `Ctrl-M` arrives as
-itself and the hint bar says `Ctrl-M`. Where it does not, `Ctrl-M` is
-indistinguishable from Enter and the hint bar says `gm` instead, because
-advertising a key that edits the block is worse than advertising a two-key
-sequence. The same negotiation fixes the other four collisions in this family:
-`Ctrl-I`/Tab, `Ctrl-H`/Backspace, `Ctrl-[`/Esc and `Ctrl-J`/Enter. `gm` and
-`:set meta` work everywhere.
+`Enter` under the legacy encoding, which is *why* the panel has a letter of its
+own (`m`) and why `gm` existed as a fallback. The kitty keyboard protocol is
+still requested on startup, because the remaining Ctrl aliases want it:
+`Ctrl-]`, `Ctrl-o`/`Ctrl-i`, `Ctrl-r`, `Ctrl-s`, `Ctrl-w l`. Where the terminal
+speaks it, those arrive as themselves; where it does not, the plain letters do
+the same job, which is the point of the pass.
 
-**Page metadata** (`Ctrl-M`) is off by default and the hint bar advertises it
-(`Ctrl-M page metadata`), so a hidden panel is an invitation rather than a
+**Page metadata** (`m`) is off by default and the hint bar advertises it
+(`m metadata`), so a hidden panel is an invitation rather than a
 mystery. It persists in `settings`, and `:set nometa` turns it off.
 
 ![Page metadata on a journal](dumps/png/26-page-metadata.png)
 
-**Find** (`Ctrl-P`) is the navigation. With no query it lists what you touched
+**Find** (`/`) is the navigation. With no query it lists what you touched
 last — journals by relative date, pages by recency, each with its most recent
 block as a preview — so "the thing I was writing yesterday" is two keys away.
 Type and it becomes a search across page **names** and block **text**; a content
@@ -584,7 +579,7 @@ grow by accident.
 The outline keeps a short explicit list (`OUTLINE_FROM_TEXT`): the motions that
 leave the block (`j` `k` `h` `l` `gg` `G` `Ctrl-d` `Ctrl-u`), the new-block keys
 (`o` `O`), folds and the block-range selection (`z*`, `v`, `V`), and the
-app-level keys (`Ctrl-P`, `:`, `?`, `u`, `Ctrl-r`, `Ctrl-]`, `[`, `]`, …). **A key
+app-level keys (`/`, `m`, `s`, `:`, `?`, `u`, `R`, `f`, `[`, `]`, …). **A key
 the grammar does not know is refused**, with a toast, and the caret stays exactly
 where it is. That is the rule that makes the table above impossible to
 reintroduce by accident.
@@ -722,7 +717,7 @@ offers. Its right end then carries the caret's `line, col` inside that block
 (§7.1), which is the one piece of state a vim user expects to be able to read off
 the bottom of the screen.
 
-**Following links.** `Ctrl-]` (and `gf`) behave like vim's tag jump, with
+**Following links.** `f` (and `Ctrl-]`/`gf`) behaves like vim's tag jump, with
 `Ctrl-o`/`Ctrl-i` walking the jumplist. A block that contains links is marked
 `↗N` in the outline, and the hint bar for a block with links leads with
 "Ctrl-] follow N links" — so a link is a visible destination rather than a
@@ -746,8 +741,44 @@ vim's grammar is made visible rather than assumed.
 
 ## 8. Keymap
 
+**The rule: one letter per action, in the mode where the action acts.** Reading
+mode is for reading — traverse, open, look things up — so nothing in it should
+need a chord. Before this pass six of the eight things you do while reading were
+Ctrl-only or hidden behind a `g` prefix:
+
+| action | was | is | alias kept |
+|---|---|---|---|
+| find + search | `Ctrl-P` (Find) and `/` (a separate screen) | `/` — one prompt: recent pages, then names *and* block text | `Ctrl-P` |
+| page metadata | `Ctrl-M`, `gm` | `m` | `Ctrl-M`, `gm` |
+| follow a link | `Ctrl-]`, `gf` | `f` | `Ctrl-]`, `gf` |
+| snapshot | `Ctrl-S` | `s` | `Ctrl-S` (any mode) |
+| redo | `Ctrl-r` | `R` | `Ctrl-r` |
+| the metadata panel | `Ctrl-w l` | `Tab` — shows it, focuses it, comes back | `Ctrl-w l` |
+| half page | `Ctrl-d` / `Ctrl-u` | `Ctrl-d` / `Ctrl-u`, and PageUp/PageDown | — |
+
+Two things were deliberately *not* done. `Ctrl-d`/`Ctrl-u` stay: they are vim's,
+they are for reading a long outline, and the physical PageUp/PageDown keys do the
+same thing for anyone who would rather not. And the Ctrl spellings are kept as
+aliases — they cost nothing, they are one row in the manual, and a vim habit
+should not be punished. The claim to check is the plain one: **in NORMAL mode,
+no Ctrl is required.**
+
+Three consequences worth stating:
+
+* `/` is now Find, and the full-screen ranked list (with a preview pane) is
+  reachable as `:search <query>` with its own `n`/`N`. One search prompt in the
+  keyspace, one screen for browsing — and the keyspace lost `n`/`N`, which only
+  ever meant anything while that screen was open.
+* `Tab` means "the other pane" in the outline and "indent this line" in the text.
+  One key, two domains, both stated by the hint bar and the `in block` chip. The
+  outline's indent is `>>`, which says what it does.
+* `m` is a letter, so the terminal-dependency went away: the hint bar no longer
+  has to name `gm` on terminals where `Ctrl-M` arrives as Enter, and the
+  `ctrl_m_works` flag and its detection are gone.
+
 `?` opens the two-column reference; the single source of truth is `KEYMAP` in
-`src/app.rs`, rendered verbatim by the help screen. The table:
+`src/app.rs`, rendered verbatim by the help screen. The table (primaries; the
+aliases are listed in the manual):
 
 | Keys | Action |
 |---|---|
@@ -760,18 +791,18 @@ vim's grammar is made visible rather than assumed.
 | `gg` `G` `Ctrl-d` `Ctrl-u` | first · last · half page down · half page up |
 | `[` `]` | **back / forward**: the pages you have opened (`Ctrl-o`/`Ctrl-i` too) |
 | `:prev` `:next` | previous / next journal day, deliberately not on a single key |
-| `Ctrl-P` | **open any page**: page/journal picker, filter as you type |
-| `Ctrl-w l` | focus the metadata panel (once shown) |
-| `Ctrl-]` or `gf` | follow the link on this block (menu when there are several) |
-| `Ctrl-o` `Ctrl-i` | the same two motions as `[`/`]`, from vim's jumplist |
+| `/` | **find and search**: recent pages, then names *and* block text (`Ctrl-P` too) |
+| `m` | show / hide the page metadata: facts, links, mentions |
+| `Tab` | the metadata panel: shows it, focuses it, and back |
+| `f` | follow the link on this block (menu when there are several) |
 | `Enter` (references pane) | open the block that references this page |
 | `dd` `x` | delete the block, subtree included |
 | `yy` `Y` | yank the block into the register |
 | `p` `P` | paste the register after / before |
-| `>>` `<<` | indent / outdent the **block** (from the tree, `Tab`/`Shift-Tab` too) |
+| `>>` `<<` | indent / outdent the **block** (in the text, `Tab`/`Shift-Tab` the line) |
 | `Tab` `Shift-Tab` (in the text) | indent / dedent the **line the caret is on** |
 | `J` | join: merge this block with the one below |
-| `u` `Ctrl-r` | undo / redo |
+| `u` `R` | undo / redo (`Ctrl-r` too) |
 | `za` `zc` `zo` `zR` `zM` | fold · close · open · all open · all closed |
 | `w` `b` `e` `0` `^` `$` | word and line motions, with the caret in a block |
 | `x` `dw` `d$` `D` `cw` `ciw` `C` | delete / change, with the caret in a block |
@@ -779,9 +810,8 @@ vim's grammar is made visible rather than assumed.
 | `v` / `V` | select a block range / a whole subtree |
 | `>` `<` `d` `y` `J` `K` | indent, delete, yank, reorder the selection (VISUAL) |
 | `:` | ex command line, Tab-completed |
-| `/` `n` `N` | search the graph · next · previous match |
-| `Ctrl-M` | show / hide page metadata (facts, links, mentions) |
-| `Ctrl-S` | snapshot, then the storage screen |
+| `:search` | the full-screen ranked list, with `n`/`N` of its own |
+| `s` | snapshot, then the storage screen (`Ctrl-S` from any mode) |
 | `q` `ZZ` `ZQ` `:q` | quit · snapshot-and-quit · quit without pruning · quit |
 | `:w` `:q` `:q!` `:e` `:set` `:sql` `:board` `:storage` `:prune` `:m` `:search` | see `EX_COMMANDS` |
 | `?` | the keymap |
@@ -943,7 +973,7 @@ Being explicit about this matters more than the demo looking good.
   `typing_in_the_link_chooser_filters_and_leaves_the_block_alone`. Both exist
   because the chooser only appears with two or more links in a block and every
   earlier test had one.
-* The text layer is covered by 81 regression tests in total (`cargo test`), one
+* The text layer is covered by 83 regression tests in total (`cargo test`), one
   per bug this project has actually shipped. The text grammar has its own unit
   tests in `editor.rs` (`Editor::command` is testable without a terminal), plus
   `text_keys_do_text_things_not_outline_things` -- the audit table above, as
@@ -956,7 +986,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 31 frames in this document are the app's own renderer (31 frames, 81
+* All 31 frames in this document are the app's own renderer (31 frames, 83
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 

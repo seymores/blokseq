@@ -21,4 +21,4 @@
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  NORMAL    3/12  depth 1
- Ctrl-M metadata   j/k blocks   ⏎ / i edit   w b e words            ? all keys
+ m metadata   j/k blocks   ⏎ / i edit   w b e words   / find        ? all keys

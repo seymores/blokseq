@@ -1,29 +1,32 @@
-╭ KEYMAP · MODES → INLINE COMPLETION ───────────────────────────────────╮╭ KEYMAP · COMMANDS → VIEWS ──────────────────────────────────────╮
+╭ KEYMAP · HOW THE KEYS WORK → INLINE COMPLETION ───────────────────────╮╭ KEYMAP · PANELS AND VIEWS → VIEWS ──────────────────────────────╮
 │                                                                       ││                                                                 │
-│  MODES                                                                ││  COMMANDS                                                       │
-│  Esc                 one press always stops editing; a secon…Any      ││  :                   ex command line (Tab completes, :help l…Nor│
-│  Enter               put the cursor in this block's text     Normal   ││  Ctrl-P              Find: recent pages, then a search of na…Any│
-│  i a I A             insert · append · line start · line end Normal   ││  / n N               search the graph · next · previous      Nor│
-│  o O cc              open a block below · above · change thi…Normal   ││  ?                   this keymap                             Any│
+│  HOW THE KEYS WORK                                                    ││  PANELS AND VIEWS                                               │
+│  one letter          everything you need in NORMAL mode is o…Normal   ││  m                   page metadata: facts, links, mentions; …Nor│
+│  the caret decides   text verbs with the caret in a block, o…Any      ││  Tab                 the metadata panel: shows it, focuses i…Nor│
+│  Esc                 one press always stops editing; a secon…Any      ││  s                   snapshot the database and queue it for …Nor│
+│                                                                       ││  :                   ex command line (Tab completes, :help l…Nor│
+│  READING AND MOVING                                                   ││  ?                   this manual; `j`/`k` scroll it          Nor│
+│  j k h l             next · previous · parent · first child  Normal   ││  q / :q              quit, pruning unwritten journals first  Nor│
+│  w b e               put the caret in this block and move by…Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
+│  gg G                first · last block                      Normal   ││                                                                 │
+│  Ctrl-d / Ctrl-u     half page down / up (PageUp / PageDown …Normal   ││  ALIASES                                                        │
+│  [ / ]               back / forward through the pages you ha…Normal   ││  Ctrl-P / Ctrl-M     the same as `/` and `m`                 Nor│
+│  Enter / i           put the caret in this block's text      Normal   ││  gm                  the same as `m`, for terminals where Ct…Nor│
+│  /                   find and search: recent pages, then nam…Normal   ││  Ctrl-o / Ctrl-i     the same as `[` and `]`                 Nor│
+│                                                                       ││  Ctrl-] · gf         the same as `f`                         Nor│
+│  FOLLOWING LINKS                                                      ││  Ctrl-w l            the same as `Tab`                       Nor│
+│  f                   follow the link on this block (menu whe…Normal   ││  Ctrl-r / Ctrl-s     redo · snapshot (Ctrl-s works mid-sente…Any│
+│  Enter in refs       open the block that references this pageNormal   ││  :set meta | nometa  the panel, spelled out, and persisted   Ex │
+│                                                                       ││  :sql                read-only SQL console, on demand        Ex │
+│  EDITING THE OUTLINE                                                  ││  :w                  snapshot + queue for the remote         Ex │
+│  o O                 open a block below · above              Normal   ││  :prev / :next       previous / next journal day             Ex │
+│  dd / x              delete block, subtree included          Normal   ││  :search             the full-screen ranked list, with its o…Ex │
+│  yy / Y              yank block into the register            Normal   ││                                                                 │
+│  p / P               paste register after / before           Normal   ││  VIEWS                                                          │
+│  >> / <<             indent / outdent the block (`Tab` does …Normal, V││  ↑↓ ⏎                the search screen: pick a hit, open its…Any│
+│  J                   join this block with the one below      Normal   ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
 │  v / V               select a block range / a whole subtree  Normal   ││                                                                 │
-│                                                                       ││  NAVIGATION                                                     │
-│  BLOCK MOTIONS                                                        ││  [ / ]               back / forward through the pages you ha…Nor│
-│  j k h l             next · previous · parent · first child  Normal   ││  Ctrl-o / Ctrl-i     the same two motions, from vim's jumpli…Nor│
-│  w b e (from the tree)put the caret in this block and move by…Normal  ││  Ctrl-w l            focus the metadata panel (once shown)   Nor│
-│  gg G                first · last block                      Normal   ││  :prev / :next       previous / next journal day             Ex │
-│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││                                                                 │
-│                                                                       ││  PANELS AND TROUBLESHOOTING                                     │
-│  FOLLOWING LINKS                                                      ││  Ctrl-M · gm         show / hide page metadata (facts, refs,…Any│
-│  Ctrl-]              follow the link here (menu when there a…Normal   ││  :set meta | nometa  the same, spelled out, and persisted    Ex │
-│  Enter in refs       open the block that references this pageNormal   ││  :sql                read-only SQL console, on demand        Ex │
-│                                                                       ││  :w                  snapshot + queue for the remote         Ex │
-│  OPERATORS                                                            ││  Ctrl-S              snapshot, then the storage screen       Any│
-│  dd / x              delete block, subtree included          Normal   ││  q / :q              quit, pruning unwritten journals first  Nor│
-│  yy / Y              yank block into the register            Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
-│  p / P               paste register after / before           Normal   ││                                                                 │
-│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││  VIEWS                                                          │
-│  J                   join this block with the one below      Normal   ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
-│  u / Ctrl-r          undo / redo                             Any      ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
+│  u / R               undo / redo                             Normal   ││                                                                 │
 │  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││                                                                 │
 │                                                                       ││                                                                 │
 │  THE TEXT LAYER                                                       ││                                                                 │
@@ -34,9 +37,6 @@
 │  dw de db d0 d$      delete by motion (`dw` eats the space, …Text     ││                                                                 │
 │  cw ciw c$ C         change: a motion, a text object, to lin…Text     ││                                                                 │
 │  dd yy p P           the line's *text* -- the block's verbs …Text     ││                                                                 │
-│  w b e at the edges  carry on into the block below / above, …Text     ││                                                                 │
-│  J >> <<             join the next line · shift this line    Text     ││                                                                 │
-│  u / Ctrl-r          undo / redo: leaving the text commits i…Text     ││                                                                 │
 ╰───────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
- NORMAL  rows 1–38 of 47 · j/k scroll
+ NORMAL  rows 1–38 of 51 · j/k scroll
  j/k scroll   Esc back   q quit

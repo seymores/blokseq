@@ -288,7 +288,7 @@ fn render_outliner(f: &mut Frame, app: &mut App, area: Rect) -> Option<(u16, u16
     // cursor follows. `caret` below also covers "where the selected row is",
     // which is a popup anchor rather than a cursor.
     let mut edit_caret: Option<(u16, u16)> = None;
-    // Where the cursor row sits, so a popup with no editor (the `Ctrl-]` link
+    // Where the cursor row sits, so a popup with no editor (the `f` link
     // chooser) still has something to hang off.
     let mut sel_y: Option<u16> = None;
     let editing_id = app.editor.as_ref().map(|e| e.block_id);
@@ -458,7 +458,7 @@ fn block_lines(app: &App, row: &Row, width: usize, selected: bool) -> Vec<Line<'
         return code_lines(&code, row, prefix, prefix_w, width, selected);
     }
     // A block with links says so, so that "can I go somewhere from here?" is
-    // answerable by looking. `Ctrl-]` / `gf` follows them.
+    // answerable by looking. `f` (or `Ctrl-]`/`gf`) follows them.
     let links = crate::model::parse_refs(&row.content).len();
     // Those markers ride at the end of the first line, so the text has to leave
     // room for them: they were being appended past the pane width, and the
@@ -2055,7 +2055,7 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                     let mut v: Vec<(String, String)> = Vec::new();
                     if links > 0 {
                         v.push((
-                            "Ctrl-]".into(),
+                            "f".into(),
                             format!(
                                 "follow {} link{}",
                                 links,
@@ -2071,16 +2071,18 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                         ("j/k".into(), "blocks".into()),
                         ("⏎ / i".into(), "edit".into()),
                         ("w b e".into(), "words".into()),
+                        ("/".into(), "find".into()),
                         ("o".into(), "new block".into()),
-                        ("Ctrl-P".into(), "Find".into()),
-                        ("h/l".into(), "up · down".into()),
                         ("[ ]".into(), "back / forward".into()),
                         ("?".into(), "all keys".into()),
                     ]);
+                    // State-driven, and short: what you cannot see is what gets
+                    // a chip. `m` shows the panel; once it is up, `Tab` is the
+                    // key that matters (and `m` still hides it).
                     if !app.show_meta {
-                        v.insert(0, (app.meta_key().into(), "metadata".into()));
-                    } else if app.focus == Focus::Main {
-                        v.push((app.meta_key().into(), "hide".into()));
+                        v.insert(0, ("m".into(), "metadata".into()));
+                    } else {
+                        v.insert(0, ("Tab".into(), "panel".into()));
                     }
                     v
                 }
@@ -2879,11 +2881,11 @@ fn main() { println!(\"[[x]]\"); }
 
         assert_eq!(
             column_title(&crate::app::KEYMAP[..split]),
-            "KEYMAP · MODES → INLINE COMPLETION"
+            "KEYMAP · HOW THE KEYS WORK → INLINE COMPLETION"
         );
         assert_eq!(
             column_title(&crate::app::KEYMAP[split..]),
-            "KEYMAP · COMMANDS → VIEWS"
+            "KEYMAP · PANELS AND VIEWS → VIEWS"
         );
         // Nothing may be orphaned on the wrong side of the split.
         // Section names are title case in the data and uppercased for display.
@@ -2892,7 +2894,7 @@ fn main() { println!(\"[[x]]\"); }
                 .iter()
                 .any(|(k, d, _)| d.is_empty() && k.eq_ignore_ascii_case(want))
         };
-        assert!(holds(&crate::app::KEYMAP[..split], "MODES"));
+        assert!(holds(&crate::app::KEYMAP[..split], "THE TEXT LAYER"));
         assert!(!holds(&crate::app::KEYMAP[..split], "VIEWS"));
         assert!(holds(&crate::app::KEYMAP[split..], "VIEWS"));
     }
@@ -3005,7 +3007,10 @@ fn main() { println!(\"[[x]]\"); }
                 .map(|y| row_text(&term, 120, y) + "\n")
                 .collect()
         };
-        assert!(top.contains("MODES"), "the first section is at the top: {top}");
+        assert!(
+            top.contains("HOW THE KEYS WORK"),
+            "the first section is at the top: {top}"
+        );
         // The left column is the long one; its last section is off the bottom.
         assert!(
             !top.contains("INLINE COMPLETION"),
@@ -3026,7 +3031,7 @@ fn main() { println!(\"[[x]]\"); }
             bottom.contains("INLINE COMPLETION"),
             "the last section is reachable: {bottom}"
         );
-        assert!(!bottom.contains("MODES"));
+        assert!(!bottom.contains("HOW THE KEYS WORK"));
         let status = status_line(&term_after(&mut a, 120, 30), 120, 30);
         assert!(status.contains("j/k scroll"), "the status says where you are: {status}");
 

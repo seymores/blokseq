@@ -225,7 +225,6 @@ pub struct App {
     /// Whether this terminal can tell `Ctrl-M` from `Enter`. Under the legacy
     /// encoding they are the same byte, so the hint bar names `gm` when it
     /// cannot, instead of advertising a key that edits the block instead.
-    pub ctrl_m_works: bool,
 
     pub right_selected: usize,
     pub linked: Vec<(String, Vec<RefHit>)>,
@@ -292,7 +291,6 @@ impl App {
             redo: Vec::new(),
             show_meta,
             meta: None,
-            ctrl_m_works: false,
             right_selected: 0,
             linked: Vec::new(),
             linked_selected: 0,
@@ -361,13 +359,6 @@ impl App {
     /// `Ctrl-M` where the terminal can distinguish it from Enter, `gm` where it
     /// cannot. Advertising a key that edits the block instead is worse than
     /// advertising a two-key sequence.
-    pub fn meta_key(&self) -> &'static str {
-        if self.ctrl_m_works {
-            "Ctrl-M"
-        } else {
-            "gm"
-        }
-    }
 
     pub fn load_right(&mut self) {
         self.linked = match self.page_id {
@@ -1683,30 +1674,41 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
 /// keymap row moved it and left the second column headed "LINKS & PERSISTENCE"
 /// while it was in fact showing completion, commands and panels. The headings
 /// are now derived from the sections a column holds, so they cannot rot again.
-pub const HELP_COLUMN_2: &str = "Commands";
+pub const HELP_COLUMN_2: &str = "Panels and views";
 
 pub const KEYMAP: &[(&str, &str, &str)] = &[
-    ("Modes", "", ""),
+    ("How the keys work", "", ""),
+    (
+        "one letter",
+        "everything you need in NORMAL mode is one key; Ctrl spellings are aliases",
+        "Normal",
+    ),
+    (
+        "the caret decides",
+        "text verbs with the caret in a block, outline verbs in the tree",
+        "Any",
+    ),
     ("Esc", "one press always stops editing; a second drops the caret", "Any"),
-    ("Enter", "put the cursor in this block's text", "Normal"),
-    ("i a I A", "insert · append · line start · line end", "Normal"),
-    ("o O cc", "open a block below · above · change this one", "Normal"),
-    ("v / V", "select a block range / a whole subtree", "Normal"),
-    ("Block motions", "", ""),
+    ("Reading and moving", "", ""),
     ("j k h l", "next · previous · parent · first child", "Normal"),
-    ("w b e (from the tree)", "put the caret in this block and move by word", "Normal"),
+    ("w b e", "put the caret in this block and move by word", "Normal"),
     ("gg G", "first · last block", "Normal"),
-    ("Ctrl-d / Ctrl-u", "half page down / up", "Normal"),
+    ("Ctrl-d / Ctrl-u", "half page down / up (PageUp / PageDown do the same)", "Normal"),
+    ("[ / ]", "back / forward through the pages you have opened", "Normal"),
+    ("Enter / i", "put the caret in this block's text", "Normal"),
+    ("/", "find and search: recent pages, then names *and* block text", "Normal"),
     ("Following links", "", ""),
-    ("Ctrl-]", "follow the link here (menu when there are several)", "Normal"),
+    ("f", "follow the link on this block (menu when there are several)", "Normal"),
     ("Enter in refs", "open the block that references this page", "Normal"),
-    ("Operators", "", ""),
+    ("Editing the outline", "", ""),
+    ("o O", "open a block below · above", "Normal"),
     ("dd / x", "delete block, subtree included", "Normal"),
     ("yy / Y", "yank block into the register", "Normal"),
     ("p / P", "paste register after / before", "Normal"),
-    (">> / <<", "indent / outdent (Tab and Shift-Tab too)", "Normal, Visual"),
+    (">> / <<", "indent / outdent the block (`Tab` does this in the text)", "Normal, Visual"),
     ("J", "join this block with the one below", "Normal"),
-    ("u / Ctrl-r", "undo / redo", "Any"),
+    ("v / V", "select a block range / a whole subtree", "Normal"),
+    ("u / R", "undo / redo", "Normal"),
     ("za zc zo zR zM", "fold · close · open · all open · all closed", "Normal"),
     ("The text layer", "", ""),
     ("w b e 0 ^ $", "word and line motions inside one block", "Text"),
@@ -1718,7 +1720,8 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("dd yy p P", "the line's *text* -- the block's verbs are the tree's", "Text"),
     ("w b e at the edges", "carry on into the block below / above, as vim wraps lines", "Text"),
     ("J >> <<", "join the next line · shift this line", "Text"),
-    ("u / Ctrl-r", "undo / redo: leaving the text commits it first", "Text"),
+    ("Tab / Shift-Tab", "indent / dedent the line the caret is on", "Text"),
+    ("u / R", "undo / redo: leaving the text commits it first", "Text"),
     ("Esc", "leave the text; the outline's verbs come back", "Text"),
     ("Ctrl-w / Ctrl-u", "delete word / to line start", "Insert"),
     ("⏎ in a fence", "newline, indented like the line above", "Insert"),
@@ -1727,26 +1730,28 @@ pub const KEYMAP: &[(&str, &str, &str)] = &[
     ("Inline completion", "", ""),
     ("/", "slash commands inside a block", "Insert"),
     ("[[ (( #", "page link · block ref · tag", "Insert"),
-    ("Commands", "", ""),
+    ("Panels and views", "", ""),
+    ("m", "page metadata: facts, links, mentions; `m` again hides it", "Normal"),
+    ("Tab", "the metadata panel: shows it, focuses it, and comes back", "Normal"),
+    ("s", "snapshot the database and queue it for the remote", "Normal"),
     (":", "ex command line (Tab completes, :help lists)", "Normal"),
-    ("Ctrl-P", "Find: recent pages, then a search of names and block text", "Any"),
-    ("/ n N", "search the graph · next · previous", "Normal"),
-    ("?", "this keymap", "Any"),
-    ("Navigation", "", ""),
-    ("[ / ]", "back / forward through the pages you have opened", "Normal"),
-    ("Ctrl-o / Ctrl-i", "the same two motions, from vim's jumplist", "Normal"),
-    ("Ctrl-w l", "focus the metadata panel (once shown)", "Normal"),
-    (":prev / :next", "previous / next journal day", "Ex"),
-    ("Panels and troubleshooting", "", ""),
-    ("Ctrl-M · gm", "show / hide page metadata (facts, refs, mentions)", "Any"),
-    (":set meta | nometa", "the same, spelled out, and persisted", "Ex"),
-    (":sql", "read-only SQL console, on demand", "Ex"),
-    (":w", "snapshot + queue for the remote", "Ex"),
-    ("Ctrl-S", "snapshot, then the storage screen", "Any"),
+    ("?", "this manual; `j`/`k` scroll it", "Normal"),
     ("q / :q", "quit, pruning unwritten journals first", "Normal"),
     ("ZZ / ZQ", "snapshot-and-quit / quit without the prune pass", "Normal"),
+    ("Aliases", "", ""),
+    ("Ctrl-P / Ctrl-M", "the same as `/` and `m`", "Normal"),
+    ("gm", "the same as `m`, for terminals where Ctrl-M is Enter", "Normal"),
+    ("Ctrl-o / Ctrl-i", "the same as `[` and `]`", "Normal"),
+    ("Ctrl-] · gf", "the same as `f`", "Normal"),
+    ("Ctrl-w l", "the same as `Tab`", "Normal"),
+    ("Ctrl-r / Ctrl-s", "redo · snapshot (Ctrl-s works mid-sentence too)", "Any"),
+    (":set meta | nometa", "the panel, spelled out, and persisted", "Ex"),
+    (":sql", "read-only SQL console, on demand", "Ex"),
+    (":w", "snapshot + queue for the remote", "Ex"),
+    (":prev / :next", "previous / next journal day", "Ex"),
+    (":search ", "the full-screen ranked list, with its own n / N", "Ex"),
     ("Views", "", ""),
-    ("/ then type", "the search screen is a prompt: ↑↓ pick, ⏎ opens the block", "Any"),
+    ("↑↓ ⏎", "the search screen: pick a hit, open its block", "Any"),
     ("h l j k ⏎", "on the board: columns, rows, jump to the block", "Any"),
 ];
 

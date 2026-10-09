@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL    1/2
- Ctrl-M metadata   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down   [ ] back / forward   ? all keys
+ m metadata   j/k blocks   ⏎ / i edit   w b e words   / find   o new block   [ ] back / forward   ? all keys

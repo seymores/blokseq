@@ -1,7 +1,7 @@
 ╭ 2026-10-09  today · 12 blocks ───────────────────────────────────────────────────────────────────╮╭ PAGE METADATA  2 refs ───────────────╮
 │ ▾ Deep work 09:00–12:30 on the block store                                                       ││ kind       journal                   │
-│ │ • Replaced the integer  position  with a fractional index                                      ││ created    2026-10-09 11:17          │
-│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││ updated    2026-10-09 11:17          │
+│ │ • Replaced the integer  position  with a fractional index                                      ││ created    2026-10-09 20:39          │
+│ │ • Reordering 4k siblings was O(n) writes → now it is one row                                   ││ updated    2026-10-09 20:39          │
 │▌▾ Standup — [[Project Aurora]] ↗1                                                                ││ blocks     12 blocks                 │
 │ │ • Export format settled: the SQLite file *is* the format                                       ││ links      2 in · 6 out              │
 │ │ ▾ TODO Ask Dana whether the trial keys rotate monthly                                          ││ properties none                      │
@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────╯
  ·  Ctrl-M: what this page is, and what points at it   hidden by default · :set meta keeps it on
  NORMAL    4/12
- Ctrl-] follow 1 link   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down                      Ctrl-M hide
+ Tab panel   f follow 1 link   j/k blocks   ⏎ / i edit   w b e words   / find   o new block   [ ] back / forward   ? all keys

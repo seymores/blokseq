@@ -209,7 +209,6 @@ fn run_tui(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
             )
         );
     }
-    app.ctrl_m_works = enhanced;
 
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
         loop {

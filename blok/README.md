@@ -25,7 +25,7 @@ cargo run -- --db ./scratch.db        # use a throwaway database
 cargo run -- --dump dumps             # re-render every mockup frame
 cargo run -- --demo-lifecycle         # print the journal create/prune trace
 cargo run -- --stats                  # row counts, FTS5 availability, integrity
-cargo test                            # 81 regression tests, one per bug
+cargo test                            # 83 regression tests, one per bug
 ```
 
 Dependencies: `ratatui` 0.30, `crossterm` 0.29, `rusqlite` 0.40 (`bundled`, so
@@ -67,8 +67,8 @@ tools/         render_png.py — ANSI frame -> PNG screenshot
 | 22 | `22-text-normal-vim` | TEXT mode: vim's Normal mode with the cursor in the block |
 | 23 | `23-ex-command-line` | the `:` command line, with completion |
 | 24-25 | `24-sql-console`, `25-sql-tables` | the read-only troubleshooting console |
-| 26 | `26-page-metadata` | `Ctrl-M`: page facts, backlinks, unlinked mentions |
-| 27 | `27-find-recent` | `Ctrl-P` with no query: what you touched last |
+| 26 | `26-page-metadata` | `m`: page facts, backlinks, unlinked mentions |
+| 27 | `27-find-recent` | `/` with no query: what you touched last |
 
 ## Editing model
 
@@ -86,16 +86,20 @@ operate on whole subtrees,
 `:w`, `:set`, `:sql`, `:board`, `:m +1`). The five deliberate deviations from vim
 are listed in [DESIGN.md §7.7](DESIGN.md).
 
-**Getting around** is one key: `Ctrl-P` opens **Find** — with no query it lists
-what you touched last, and as you type it searches page names *and* block text,
-landing on the matching block. `[`/`]` step through journal days, `Ctrl-M` shows the page metadata, and `/` searches every block. There is no top bar and no
-page sidebar; the pane title says what you are looking at and the hint bar is
-computed from what is possible right now, so it doubles as the manual.
+**Getting around is one letter per action, and no Ctrl.** `/` opens **Find** —
+with no query it lists what you touched last, and as you type it searches page
+names *and* block text, landing on the matching block. `m` shows the page
+metadata, `s` snapshots, `f` follows the link on a block, `R` redoes, `Tab` goes
+to the metadata panel, and `[`/`]` walk the pages you have opened. The Ctrl
+spellings (`Ctrl-P`, `Ctrl-M`, `Ctrl-]`, `Ctrl-o`/`Ctrl-i`, `Ctrl-r`, `Ctrl-s`)
+still work as aliases. There is no top bar and no page sidebar; the pane title
+says what you are looking at and the hint bar is computed from what is possible
+right now, so it doubles as the manual.
 
-**Page metadata** is one key: `Ctrl-M` shows a panel with what the page *is*
+**Page metadata** is one letter: `m` shows a panel with what the page *is*
 (kind, created/updated, block count, links in/out, and its `key:: value`
 properties) followed by its linked references and unlinked mentions. It is hidden
-by default and the choice persists; `Ctrl-w l` focuses it once visible. Storage internals are not in the status bar at all —
+by default and the choice persists; `Tab` shows and focuses it in one press. Storage internals are not in the status bar at all —
 they live behind `:sql`, a read-only SQL console (`SELECT`, `PRAGMA`, `EXPLAIN`,
 `WITH`, plus `.tables` and `.schema`). The last action prints on one line above
 the status bar and clears on the next keypress.
