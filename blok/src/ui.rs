@@ -2064,15 +2064,17 @@ fn render_hints(f: &mut Frame, app: &App, area: Rect) {
                         ));
                     }
                     v.extend([
+                        // Ordered by what a reader needs first, because the
+                        // row is finite and drops its tail: navigation, the way
+                        // into the text, word motions, then structure. `za`,
+                        // `/` and `:` are in `?`, which is the pinned pair.
                         ("j/k".into(), "blocks".into()),
                         ("⏎ / i".into(), "edit".into()),
+                        ("w b e".into(), "words".into()),
                         ("o".into(), "new block".into()),
-                        ("h/l".into(), "parent · child".into()),
-                        ("za".into(), "fold".into()),
                         ("Ctrl-P".into(), "Find".into()),
+                        ("h/l".into(), "up · down".into()),
                         ("[ ]".into(), "back / forward".into()),
-                        ("/".into(), "search".into()),
-                        (":".into(), "commands".into()),
                         ("?".into(), "all keys".into()),
                     ]);
                     if !app.show_meta {

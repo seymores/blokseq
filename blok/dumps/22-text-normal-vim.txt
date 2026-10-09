@@ -1,4 +1,4 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭ 2026-10-09  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │▌▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │

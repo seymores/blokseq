@@ -3,24 +3,24 @@
 │  engine             SQLite · WAL · FTS5                      ││  one file in, one file out — no document merge, no conflict soup         │
 │  file size          108.0 KB                                 ││                                                                          │
 │  wal size           0 B                                      ││  WHEN            SIZE      STATE     FILE                                │
-│  integrity          ok                                       ││  05:43:39      1.1 MB   uploaded blok-20261008-054339.sqlite             │
-│                                                              ││  08:43:39      1.1 MB   uploaded blok-20261008-084339.sqlite             │
-│  tables                                                      ││  11:43:39      1.1 MB   uploaded blok-20261008-114339.sqlite             │
-│  pages              12 rows                                  ││  14:43:39      1.1 MB   uploaded blok-20261008-144339.sqlite             │
-│  journals           4 rows                                   ││  17:43:39      1.1 MB   uploaded blok-20261008-174339.sqlite             │
-│  blocks             39 rows                                  ││  20:43:39      1.1 MB   queued   blok-20261008-204339.sqlite             │
+│  integrity          ok                                       ││  17:17:46      1.1 MB   uploaded blok-20261008-171746.sqlite             │
+│                                                              ││  20:17:46      1.1 MB   uploaded blok-20261008-201746.sqlite             │
+│  tables                                                      ││  23:17:46      1.1 MB   uploaded blok-20261008-231746.sqlite             │
+│  pages              12 rows                                  ││  02:17:46      1.1 MB   uploaded blok-20261009-021746.sqlite             │
+│  journals           4 rows                                   ││  05:17:46      1.1 MB   uploaded blok-20261009-051746.sqlite             │
+│  blocks             39 rows                                  ││  08:17:46      1.1 MB   queued   blok-20261009-081746.sqlite             │
 │  refs               11 rows                                  ││                                                                          │
 │  properties         5 rows                                   ││  WHY THIS IS SAFE                                                        │
 │                                                              ││  ▸ VACUUM INTO writes a consistent snapshot while the app keeps running. │
 │  maintenance                                                 ││  ▸ The snapshot is a plain SQLite file: restore = copy it back and open. │
 │  empty blocks       1 (transient)                            ││  ▸ WAL means a crash mid-write replays instead of corrupting.            │
 │  pruned journals    6 removed                                ││  ▸ Syncing a live .db by file copy is not safe; syncing a snapshot is.   │
-│      · 2026-09-29  empty → dropped                           ││  ▸ History is the snapshot list: point-in-time restore without git.      │
-│      · 2026-09-30  empty → dropped                           ││                                                                          │
+│      · 2026-09-30  empty → dropped                           ││  ▸ History is the snapshot list: point-in-time restore without git.      │
 │      · 2026-10-01  empty → dropped                           ││                                                                          │
 │      · 2026-10-02  empty → dropped                           ││                                                                          │
 │      · 2026-10-03  empty → dropped                           ││                                                                          │
 │      · 2026-10-04  empty → dropped                           ││                                                                          │
+│      · 2026-10-05  empty → dropped                           ││                                                                          │
 │                                                              ││                                                                          │
 │  layout                                                      ││                                                                          │
 │  ~/.blok/                                                    ││                                                                          │

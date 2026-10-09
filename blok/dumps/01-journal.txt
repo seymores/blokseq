@@ -1,4 +1,4 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭ 2026-10-09  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
@@ -39,4 +39,4 @@
 │                                                                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  NORMAL    5/12  depth 1
- Ctrl-M metadata   j/k blocks   ⏎ / i edit   o new block   h/l parent · child   za fold   Ctrl-P Find   [ ] back / forward      ? all keys
+ Ctrl-M metadata   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down   [ ] back / forward   ? all keys

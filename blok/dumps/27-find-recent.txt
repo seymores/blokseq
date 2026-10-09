@@ -1,4 +1,4 @@
-╭ 2026-10-08  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭ 2026-10-09  today · 12 blocks ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │▌▾ Deep work 09:00–12:30 on the block store                                                                                               │
 │ │ • Replaced the integer  position  with a fractional index                                                                              │
 │ │ • Reordering 4k siblings was O(n) writes → now it is one row                                                                           │
@@ -7,10 +7,10 @@
 │ │ ▾ TODO Ask Dana whether the╭ Find  recent ──────────────────────────────────────────────────────────────╮                              │
 │ │ │ • deadline:: 2026-02-20  │› ▏type to search page names and block text                                 │                              │
 │       priority:: A           │────────────────────────────────────────────────────────────────────────────│                              │
-│ │ • DOING Write up the sync s│ ▸ 3d ago  (2026-10-05)          journal · 3d ago · 2 blocks                │                              │
-│ ▾ Idea: journals are rows, no│   2d ago  (2026-10-06)          journal · 2d ago · 1 block                 │                              │
-│ │ • An empty day should not e│   Yesterday  (2026-10-07)       journal · Yesterday · 2 blocks             │                              │
-│ • Reading:  VACUUM INTO  sema│   Today  (2026-10-08)           journal · Today · 12 blocks                │                              │
+│ │ • DOING Write up the sync s│ ▸ 3d ago  (2026-10-06)          journal · 3d ago · 2 blocks                │                              │
+│ ▾ Idea: journals are rows, no│   2d ago  (2026-10-07)          journal · 2d ago · 1 block                 │                              │
+│ │ • An empty day should not e│   Yesterday  (2026-10-08)       journal · Yesterday · 2 blocks             │                              │
+│ • Reading:  VACUUM INTO  sema│   Today  (2026-10-09)           journal · Today · 12 blocks                │                              │
 │ • Storage trail: [[blok TUI]]│   Project Aurora                last: Project Aurora — offline-first no…   │                              │
 │                              │   Reading list                  last: The Design of Everyday Things — r…   │                              │
 │  • type here for the next blo│   SQLite                        last: WAL, FTS5, VACUUM INTO, fractiona…   │                              │
@@ -39,4 +39,4 @@
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ·  Ctrl-P with no query: what you touched last   type to search page names and block text
  NORMAL    1/12
- Ctrl-M metadata   j/k blocks   ⏎ / i edit   o new block   h/l parent · child   za fold   Ctrl-P Find   [ ] back / forward      ? all keys
+ Ctrl-M metadata   j/k blocks   ⏎ / i edit   w b e words   o new block   Ctrl-P Find   h/l up · down   [ ] back / forward   ? all keys

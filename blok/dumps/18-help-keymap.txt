@@ -9,21 +9,22 @@
 │                                                                       ││  NAVIGATION                                                     │
 │  BLOCK MOTIONS                                                        ││  [ / ]               back / forward through the pages you ha…Nor│
 │  j k h l             next · previous · parent · first child  Normal   ││  Ctrl-o / Ctrl-i     the same two motions, from vim's jumpli…Nor│
-│  gg G                first · last block                      Normal   ││  Ctrl-w l            focus the metadata panel (once shown)   Nor│
-│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││  :prev / :next       previous / next journal day             Ex │
-│                                                                       ││                                                                 │
-│  FOLLOWING LINKS                                                      ││  PANELS AND TROUBLESHOOTING                                     │
-│  Ctrl-]              follow the link here (menu when there a…Normal   ││  Ctrl-M · gm         show / hide page metadata (facts, refs,…Any│
-│  Enter in refs       open the block that references this pageNormal   ││  :set meta | nometa  the same, spelled out, and persisted    Ex │
-│                                                                       ││  :sql                read-only SQL console, on demand        Ex │
-│  OPERATORS                                                            ││  :w                  snapshot + queue for the remote         Ex │
-│  dd / x              delete block, subtree included          Normal   ││  Ctrl-S              snapshot, then the storage screen       Any│
-│  yy / Y              yank block into the register            Normal   ││  q / :q              quit, pruning unwritten journals first  Nor│
-│  p / P               paste register after / before           Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
-│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││                                                                 │
-│  J                   join this block with the one below      Normal   ││  VIEWS                                                          │
-│  u / Ctrl-r          undo / redo                             Any      ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
-│  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
+│  w b e (from the tree)put the caret in this block and move by…Normal  ││  Ctrl-w l            focus the metadata panel (once shown)   Nor│
+│  gg G                first · last block                      Normal   ││  :prev / :next       previous / next journal day             Ex │
+│  Ctrl-d / Ctrl-u     half page down / up                     Normal   ││                                                                 │
+│                                                                       ││  PANELS AND TROUBLESHOOTING                                     │
+│  FOLLOWING LINKS                                                      ││  Ctrl-M · gm         show / hide page metadata (facts, refs,…Any│
+│  Ctrl-]              follow the link here (menu when there a…Normal   ││  :set meta | nometa  the same, spelled out, and persisted    Ex │
+│  Enter in refs       open the block that references this pageNormal   ││  :sql                read-only SQL console, on demand        Ex │
+│                                                                       ││  :w                  snapshot + queue for the remote         Ex │
+│  OPERATORS                                                            ││  Ctrl-S              snapshot, then the storage screen       Any│
+│  dd / x              delete block, subtree included          Normal   ││  q / :q              quit, pruning unwritten journals first  Nor│
+│  yy / Y              yank block into the register            Normal   ││  ZZ / ZQ             snapshot-and-quit / quit without the pr…Nor│
+│  p / P               paste register after / before           Normal   ││                                                                 │
+│  >> / <<             indent / outdent (Tab and Shift-Tab too)Normal, V││  VIEWS                                                          │
+│  J                   join this block with the one below      Normal   ││  / then type         the search screen is a prompt: ↑↓ pick,…Any│
+│  u / Ctrl-r          undo / redo                             Any      ││  h l j k ⏎           on the board: columns, rows, jump to th…Any│
+│  za zc zo zR zM      fold · close · open · all open · all cl…Normal   ││                                                                 │
 │                                                                       ││                                                                 │
 │  THE TEXT LAYER                                                       ││                                                                 │
 │  w b e 0 ^ $         word and line motions inside one block  Text     ││                                                                 │
@@ -33,10 +34,9 @@
 │  dw de db d0 d$      delete by motion (`dw` eats the space, …Text     ││                                                                 │
 │  cw ciw c$ C         change: a motion, a text object, to lin…Text     ││                                                                 │
 │  dd yy p P           the line's *text* -- the block's verbs …Text     ││                                                                 │
+│  w b e at the edges  carry on into the block below / above, …Text     ││                                                                 │
 │  J >> <<             join the next line · shift this line    Text     ││                                                                 │
 │  u / Ctrl-r          undo / redo: leaving the text commits i…Text     ││                                                                 │
-│  Esc                 leave the text; the outline's verbs com…Text     ││                                                                 │
-│  Ctrl-w / Ctrl-u     delete word / to line start             Insert   ││                                                                 │
 ╰───────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
- NORMAL  rows 1–38 of 45 · j/k scroll
+ NORMAL  rows 1–38 of 47 · j/k scroll
  j/k scroll   Esc back   q quit

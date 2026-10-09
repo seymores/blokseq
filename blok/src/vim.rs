@@ -138,6 +138,52 @@ impl App {
         self.mode = Mode::Normal;
     }
 
+    /// Is this key sequence a *bare* word motion (`w`, `3w`, `e`, …)? `dw` and
+    /// the rest belong to the operator path inside the grammar, not here.
+    fn is_word_motion(seq: &str) -> bool {
+        let rest = seq.trim_start_matches(|c: char| c.is_ascii_digit());
+        matches!(rest, "w" | "W" | "b" | "B" | "e" | "E") && !rest.is_empty()
+    }
+
+    /// A word motion with the caret in a block.
+    ///
+    /// Vim's `w` at the end of a line moves to the next line, and in an outliner
+    /// the next line is the next *block*: so `w`/`e` that cannot move carry on
+    /// into the block below, and `b`/`B` into the one above, landing on the word
+    /// they would have landed on. Word motions therefore walk the outline one
+    /// word at a time, which is what "move the caret forward to the next word"
+    /// means when the file is a tree.
+    fn word_motion(&mut self, seq: &str) {
+        let before = self.editor.as_ref().map(|e| e.cursor);
+        let outcome = self.editor.as_mut().map(|ed| ed.command(seq));
+        let after = self.editor.as_ref().map(|e| e.cursor);
+        if before != after || outcome.is_none() {
+            return;
+        }
+        let forward = seq.ends_with(['w', 'W', 'e', 'E']);
+        let at = self.selected;
+        self.leave_text();
+        self.move_selection(if forward { 1 } else { -1 });
+        if self.selected == at {
+            // Nowhere to go: vim stops at the end of the buffer, and it stops
+            // *in the buffer*. Leaving the text here would drop the caret out
+            // from under you for pressing a key that did nothing.
+            self.enter_text();
+            if let Some(ed) = self.editor.as_mut() {
+                ed.cursor = ed.chars.len().min(before.unwrap_or(ed.cursor));
+            }
+            return;
+        }
+        self.enter_text();
+        if !forward {
+            // Backwards lands on the *last* word of the block above.
+            if let Some(ed) = self.editor.as_mut() {
+                ed.end();
+                ed.word_prev(false);
+            }
+        }
+    }
+
     /// Leave the block's text but keep the row selected (used by every tree
     /// motion, so a single `j` is always enough to get back to the blocks).
     fn leave_text(&mut self) {
@@ -1155,6 +1201,16 @@ impl App {
         // state the router may act on.
         if self.text_focus && self.editor.is_some() {
             let seq = format!("{}{}", self.pending, name);
+            // A bare word motion is the one text command that needs the outline
+            // as well -- vim's `w` at the end of a line moves to the next line --
+            // so it is handled before the grammar runs, not after. Running the
+            // grammar first and then the helper executed the motion twice, and
+            // `e` skipped a word.
+            if Self::is_word_motion(&seq) {
+                self.pending.clear();
+                self.word_motion(&seq);
+                return;
+            }
             let outcome = self
                 .editor
                 .as_mut()
@@ -1207,6 +1263,16 @@ impl App {
                     }
                 }
             }
+            return;
+        }
+
+        // From the tree, a word motion puts the caret in this block and moves:
+        // the only place words live is a block's text, so `w` is the one-key
+        // version of `Enter` then `w`. It used to be "no mapping for w", which
+        // is what "I cannot move the caret forward to a word" looked like.
+        if matches!(name.as_str(), "w" | "W" | "b" | "B" | "e" | "E") {
+            self.enter_text();
+            self.word_motion(&name);
             return;
         }
 
@@ -2482,5 +2548,99 @@ mod tests {
         );
         code(&mut a, KeyCode::Esc);
         assert!(a.db.block(id).map(|b| b.content).unwrap_or_default().contains('!'));
+    }
+
+    /// Report: "in normal mode, I cannot move carret forward to words position."
+    ///
+    /// In the *text* it already worked -- the caret moved, and the frame showed
+    /// it moving. What did not work was `w` from the tree, where the caret is
+    /// not in any words yet: it was "no mapping for w", which is exactly what
+    /// the report describes. A word motion now enters the block and moves, so
+    /// `w` is the one-key version of `Enter` then `w`.
+    #[test]
+    fn word_motions_work_from_the_tree() {
+        let mut a = app("words_from_tree");
+        assert!(!a.text_focus, "the caret starts in the tree");
+        let id = a.rows[0].id;
+
+        key(&mut a, 'w');
+        assert!(a.text_focus, "w put the caret in the block");
+        assert_eq!(a.selected_row().map(|r| r.id), Some(id), "same block");
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (1, 7),
+            "and moved to the next word, as w does from the start of a line"
+        );
+
+        // Backwards, and within the text, from either state.
+        key(&mut a, 'b');
+        assert_eq!(a.editor.as_ref().unwrap().position(), (1, 1));
+        key(&mut a, 'e');
+        assert_eq!(a.editor.as_ref().unwrap().position(), (1, 5));
+
+        // One `Esc` leaves the text (the app's rule), and the word motions work
+        // from the tree too -- so `e` on its own gets back in and lands on the
+        // end of the first word.
+        code(&mut a, KeyCode::Esc);
+        assert!(!a.text_focus, "one Esc leaves the text");
+        key(&mut a, 'e');
+        assert!(a.text_focus, "and e comes back in");
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (1, 5),
+            "on the end of the first word"
+        );
+    }
+
+    /// Vim's `w` at the end of a line moves to the next line. Here the next line
+    /// is the next block, so word motions walk the outline one word at a time
+    /// instead of stopping dead at the end of a block.
+    #[test]
+    fn word_motions_carry_on_into_the_next_block() {
+        let mut a = app("words_across");
+        key(&mut a, 'w'); // into block 1, on "block"
+        assert_eq!(a.editor.as_ref().unwrap().position(), (1, 7));
+        key(&mut a, 'w'); // the end of block 1's text, exactly as in vim
+        assert_eq!(a.editor.as_ref().unwrap().position(), (1, 12));
+        key(&mut a, 'w'); // ...and now it carries on into the block below
+        assert_eq!(a.selected, 1, "w moved to the block below");
+        assert!(a.text_focus);
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (1, 1),
+            "on the first word of that block"
+        );
+
+        // ...and `b` comes back to the last word of the block above.
+        key(&mut a, 'b');
+        assert_eq!(a.selected, 0, "b moved back up");
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            (1, 7),
+            "on the last word of the block it left"
+        );
+
+        // The two blocks are still two blocks: this is navigation, not editing.
+        assert_eq!(a.rows.len(), 2);
+    }
+
+    /// At the end of the outline there is nowhere to go, and vim stops at the
+    /// end of the buffer rather than wrapping.
+    #[test]
+    fn word_motions_stop_at_the_end_of_the_outline() {
+        let mut a = app("words_end");
+        key(&mut a, 'k'); // first block
+        key(&mut a, 'e');
+        for _ in 0..40 {
+            key(&mut a, 'w');
+        }
+        assert_eq!(a.selected, 1, "the last block");
+        let last = a.editor.as_ref().unwrap().position();
+        key(&mut a, 'w');
+        assert_eq!(
+            a.editor.as_ref().unwrap().position(),
+            last,
+            "and pressing w again does not wrap around"
+        );
     }
 }

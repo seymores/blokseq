@@ -617,6 +617,16 @@ paste is now inserted **verbatim**: newlines stay newlines, nothing is
 re-indented, and with no caret in a block it becomes one new block (the whole
 paste, because splitting it per line is a judgement a paste cannot make).
 
+**Word motions cross blocks, and work from the tree.** A word lives in a block's
+text, so `w` from the tree is the one-key version of `Enter` then `w`: it puts the
+caret in the block and moves. From there, `w`/`e` at the end of the block carry on
+into the block below, and `b`/`B` into the one above, because vim's `w` at the end
+of a line goes to the next line and in an outliner the next line is the next
+block. Word motions therefore walk the outline one word at a time, and the caret
+stays in the text at the end of the outline rather than being dropped out of it.
+This came from a report -- "in normal mode, I cannot move carret forward to words
+position" -- whose text-side behaviour already worked; the two edges were the gap.
+
 **Where the caret is, is what the keys mean.** The status bar says `in block`, the
 ruler says which line, and the hint bar swaps its whole vocabulary between the two
 domains. That is the app's answer to vim's hardest problem in an outliner: there
@@ -933,7 +943,7 @@ Being explicit about this matters more than the demo looking good.
   `typing_in_the_link_chooser_filters_and_leaves_the_block_alone`. Both exist
   because the chooser only appears with two or more links in a block and every
   earlier test had one.
-* The text layer is covered by 78 regression tests in total (`cargo test`), one
+* The text layer is covered by 81 regression tests in total (`cargo test`), one
   per bug this project has actually shipped. The text grammar has its own unit
   tests in `editor.rs` (`Editor::command` is testable without a terminal), plus
   `text_keys_do_text_things_not_outline_things` -- the audit table above, as
@@ -946,7 +956,7 @@ Being explicit about this matters more than the demo looking good.
   block; the metadata panel starts hidden, `Ctrl-M` shows it, and the choice
   persists; a message clears on the next keypress; the console refuses a
   `DELETE`.
-* All 31 frames in this document are the app's own renderer (31 frames, 78
+* All 31 frames in this document are the app's own renderer (31 frames, 81
   tests -- the numbers are close enough to check twice, which is why they are
   spelled out rather than a round "about thirty").
 
